@@ -624,13 +624,14 @@ function shareURL() {
       console.log('🔍 Looking for style:', style);
 
       // Debug: afficher les sections trouvées
-      const hasSequent = textContent.search(/sequent/i) !== -1;
-      const hasFitch = textContent.search(/fitch/i) !== -1;
-      const hasTree = textContent.search(/tree/i) !== -1;
-      console.log('📌 Sections detected: Sequent=' + hasSequent + ', Fitch=' + hasFitch + ', Tree=' + hasTree);
+	const hasSequent = textContent.search(/sequent/i) !== -1;
+        const hasTree = textContent.search(/tree/i) !== -1;
+        const hasFlag = textContent.search(/flag/i) !== -1;
+     
+	console.log('📌 Sections detected: Sequent=' + hasSequent + ', Tree=' + hasTree,  Flag=' + hasFlag + ');
 
       if (style === 'sequent') {
-        // Pour sequent: prendre uniquement entre "Sequent" et "Natural Deduction" ou "Fitch"
+        // Pour sequent: prendre uniquement entre "Sequent" et "Natural Deduction" ou "Flag"
         // Chercher la section explicitement marquée "Sequent Calculus"
 
         const sequentStartMatch = textContent.match(/[-\s]*Sequent\s+Calculus\s*[-\s]*/i);
@@ -642,9 +643,9 @@ function shareURL() {
         const sequentStart = textContent.indexOf(sequentStartMatch[0]);
         console.log('📍 Sequent starts at position:', sequentStart);
 
-        // Trouver où se termine la section Sequent (avant "Natural Deduction" ou "Fitch")
+        // Trouver où se termine la section Sequent (avant "Natural Deduction" ou "Flag")
         const naturalDeductionMatch = textContent.substring(sequentStart).search(/[-\s]*Natural\s+Deduction\s*[-\s]*/i);
-        const fitchMatch = textContent.substring(sequentStart).search(/[-\s]*a\)\s*Fitch\s+Style/i);
+        const fitchMatch = textContent.substring(sequentStart).search(/[-\s]*a\)\s*Flag\s+Style/i);
 
         let sequentEnd;
         if (naturalDeductionMatch !== -1) {
@@ -652,7 +653,7 @@ function shareURL() {
           console.log('📍 Natural Deduction found at:', sequentEnd);
         } else if (fitchMatch !== -1) {
           sequentEnd = sequentStart + fitchMatch;
-          console.log('📍 Fitch found at:', sequentEnd);
+          console.log('📍 Flag found at:', sequentEnd);
         } else {
           console.error('❌ Cannot find end of Sequent section');
           return null;
@@ -672,24 +673,24 @@ function shareURL() {
         return null;
 
       } else if (style === 'fitch') {
-        // Pour Fitch: chercher entre "Fitch" et "Tree"
-        const fitchMatch = textContent.match(/Fitch[\s-]*style[\s\S]*?(?=(?:Tree[\s-]*style|$))/i);
-        console.log('📋 Fitch match:', fitchMatch ? 'found' : 'not found');
+        // Pour Flag: chercher depuis "Flag" jusqu'à la fin (Flag est maintenant en dernier)
+        const fitchMatch = textContent.match(/Flag[\s-]*style[\s\S]*$/i);
+        console.log('📋 Flag match:', fitchMatch ? 'found' : 'not found');
 
         if (!fitchMatch) {
-          console.error('❌ No Fitch section found');
+          console.error('❌ No Flag section found');
           return null;
         }
 
         const fitchMatches = fitchMatch[0].match(/\\begin\{fitch\}[\s\S]*?\\end\{fitch\}/g);
-        console.log('📊 Fitch blocks found:', fitchMatches ? fitchMatches.length : 0);
+        console.log('📊 Flag blocks found:', fitchMatches ? fitchMatches.length : 0);
 
         if (!fitchMatches) {
-          console.error('❌ No fitch LaTeX blocks in Fitch section');
+          console.error('❌ No fitch LaTeX blocks in Flag section');
           return null;
         }
 
-        console.log('✅ Returning', fitchMatches.length, 'Fitch proofs');
+        console.log('✅ Returning', fitchMatches.length, 'Flag proofs');
         return fitchMatches.map(fitch => '\\begin{center}\n' + fitch + '\n\\end{center}').join('\n\n\\vspace{1cm}\n\n');
 
       } else if (style === 'tree') {
@@ -728,7 +729,7 @@ function shareURL() {
       console.log('Total length:', text.length);
 
       // Trouver les marqueurs
-      const markers = ['sequent', 'Sequent', 'Fitch', 'fitch', 'Tree', 'tree'];
+      const markers = ['sequent', 'Sequent', 'Flag', 'fitch', 'Tree', 'tree'];
       markers.forEach(marker => {
         const idx = text.indexOf(marker);
         if (idx !== -1) {
@@ -745,7 +746,7 @@ function shareURL() {
       // Tester les extractions
       console.log('\n=== TESTING EXTRACTIONS ===');
       console.log('Sequent:', getLatexByStyle('sequent') ? '✓ OK' : '✗ FAIL');
-      console.log('Fitch:', getLatexByStyle('fitch') ? '✓ OK' : '✗ FAIL');
+      console.log('Flag:', getLatexByStyle('fitch') ? '✓ OK' : '✗ FAIL');
       console.log('Tree:', getLatexByStyle('tree') ? '✓ OK' : '✗ FAIL');
     };
 
@@ -866,7 +867,7 @@ document.addEventListener('keydown', function(event) {
       // Ctrl/Cmd + V: Flag-style proofs
       if (key === 'l') {
         event.preventDefault();
-        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+l (Fitch styLe)');
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+l (Flag styLe)');
         convertProofToPNG('fitch');
         return;
       }
