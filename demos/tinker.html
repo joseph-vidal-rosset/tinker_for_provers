@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SWI-Tinker</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/codemirror.css">
+  <link rel="stylesheet" href="tinker.css">
+  <link rel="stylesheet" href="term.css">
+  <link rel="stylesheet" href="source.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/codemirror.min.js"></script>
+  <script src="matchbrackets.js"></script>
+  <link rel="icon" type="image/x-icon" href="https://www.swi-prolog.org/download/logo/swipl-64x64.ico">
+  <script crossorigin="anonymous" async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+  <!-- MathJax 4 Configuration -->
+  <script>
+  MathJax = {
+    loader: {load: ['[tex]/bussproofs']},
+    tex: {
+      packages: {'[+]': ['bussproofs']},
+      inlineMath: [],
+      displayMath: [['$$', '$$']]
+    },
+    startup: {
+      ready: () => {
+        console.log('✅ MathJax 4 ready with bussproofs support');
+        MathJax.startup.defaultReady();
+      }
+    }
+  };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js"></script>
+
+  <style>
+.CodeMirror, .cm-editor, .cm-content {
+    font-size: 16px !important;
+    font-family: 'Monaco', 'Menlo', monospace !important;
+}
+
+.console textarea,
+.console input[type="text"],
+.tinker-console textarea,
+.tinker-console input[type="text"] {
+    font-size: 16px !important;
+    font-family: 'Monaco', 'Menlo', monospace !important;
+}
+
+#png-display {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    background: white;
+    border: 3px solid #333;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    padding: 20px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+}
+
+#png-display img {
+    max-width: 100%;
+    cursor: pointer;
+}
+
+#png-display .close-btn {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #333;
+}
+
+.latex-copy-btn {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: sans-serif;
+}
+
+.latex-copy-btn:hover {
+    background: #45a049;
+}
+
+.latex-section-marker {
+    display: inline;
+}
+
+/* Style pour les preuves MathJax */
+.mathjax-proof-container {
+    margin: 1em 0;
+    padding: 1em;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.mathjax-proof-container h4 {
+    margin-top: 0;
+    color: #333;
+    font-family: sans-serif;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img id="logo" alt="SWI-Prolog logo" src="https://www.swi-prolog.org/download/logo/swipl-128.png">
+  <div>
+    This is <a href="https://github.com/SWI-Prolog/tinker" target="_blank">SWI-Tinker</a>:
+    <a href="https://www.swi-prolog.org" target="_blank">SWI-Prolog</a> running inside your browser</div>
+  <div>Please consult our <a href="https://github.com/SWI-Prolog/tinker/wiki" target="_blank">Wiki for help</a></div>
+<div class="github-buttons">
+  <a class="github-button" href="https://github.com/SWI-Prolog/tinker" data-color-scheme="no-preference: light; light: light; dark: dark;" data-size="large" data-show-count="true" aria-label="Star SWI-Prolog/tinker on GitHub">Star</a>
+</div>
+</div>
+<div class="content">
+  <div id="left">
+    <div class="tinker-console"></div>
+    <div id="png-display"></div>
+  </div>
+
+  <div id="right">
+    <div class="tinker-source">
+      <div class="source-files">
+	<select name="select-file"></select>
+	<button name="delete-file">&#128465;</button>
+	<button name="new-file">+</button>
+	<span class="create-file">
+          <input type="text" name="file-name" placeholder="File name">
+          <button name="create-button">Create</button>
+	</span>
+      </div>
+      <div class="editor-wrapper">
+	<div name="editor"></div>
+      </div>
+      <div class="source-buttons">
+	<button name="consult">(Re)consult</button>
+	<span class="exch-files">
+	  <input type="file" accept=".pl" multiple class="upload-file">
+	  <a class="btn upload" href="#" title="Upload files">📤</a>
+	  <a class="btn download" type="text/x-prolog">&#x1F4E5;</a>
+	</span>
+	<div style="margin-top: 10px; font-size: 11px; color: #5f5f5f; font-style: italic;">
+	  Theme: <a href="https://github.com/fniessen/emacs-leuven-theme" target="_blank" style="color: #3465a4; text-decoration: none;">Leuven for Emacs</a> by Fabrice Niessen
+	</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/wasm/swipl-bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+<script>
+  window.onload = () => {
+    if (typeof Split !== 'undefined') {
+      Split(['#left', '#right'], { gutterSize: 10 });
+    }
+  }
+</script>
+<style>
+.gutter {
+    background-color: #eee;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    cursor: col-resize;
+}
+.gutter:hover { background-color: #ddd; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+
+<script type="module">
+  import * as tinker from "./tinker.js";
+  import * as term from "./term.js";
+
+  let Prolog;
+  let Module;
+  let Tinker;
+  let Term;
+
+  var options = {
+    arguments: ['-g', 'true'],
+    locateFile: function(file) {
+      return '/wasm/' + file;
+    },
+    on_output: print_output
+  };
+
+  function print_output(line, cls, sgr) {
+    Tinker.console.print(line, cls, sgr);
+  }
+
+  SWIPL(options).then(async (module) => {
+    Module = module;
+    Prolog = Module.prolog;
+    Tinker = new tinker.Tinker({
+      root:document.querySelector("div.content"),
+      module:module,
+      banner:true
+    });
+    window.prolog = Prolog;
+    window.tinker = Tinker;
+    Term = new term.Term(Tinker.console.elem);
+
+    // Fonction pour mettre à jour l'URL basée sur l'input courant
+    // La logique de mise à jour de l'URL a été déplacée/consolidée dans le script "SOLUTION FINALE"
+    // pour éviter les conflits et les troncatures dues à une logique concurrente avec un court debounce.
+
+    // Fonction pour attacher les listeners à l'input de la console
+    function attachInputListeners() {
+      const consoleInput = document.querySelector('.tinker-console input[type="text"]') ||
+                          document.querySelector('.tinker-console textarea');
+
+      if (consoleInput && !consoleInput.dataset.listenersAttached) {
+        consoleInput.dataset.listenersAttached = 'true';
+
+        // Les listeners 'input' et 'keydown' ont été supprimés ici
+        // car la logique est gérée de manière plus robuste dans le dernier script.
+
+        console.log('✓ URL listeners attached to console input (only flag set)');
+        return true;
+      }
+      return false;
+    }
+
+    // Essayer d'attacher immédiatement
+    setTimeout(attachInputListeners, 1000);
+
+    // Observer les changements dans la console pour ré-attacher si l'input est recréé
+    const observer = new MutationObserver(() => {
+      const input = document.querySelector('.tinker-console input[type="text"]') ||
+                   document.querySelector('.tinker-console textarea');
+      if (input && !input.dataset.listenersAttached) {
+        attachInputListeners();
+      }
+    });
+
+    const consoleDiv = document.querySelector('.tinker-console');
+    if (consoleDiv) {
+      observer.observe(consoleDiv, { childList: true, subtree: true });
+    }
+
+    // Fallback: réessayer périodiquement
+    setInterval(() => {
+      const input = document.querySelector('.tinker-console input[type="text"]') ||
+                   document.querySelector('.tinker-console textarea');
+      if (input && !input.dataset.listenersAttached) {
+        attachInputListeners();
+      }
+    }, 2000);
+
+    window.checkAndExecuteURLQuery();
+  });
+</script>
+
+<script>
+  add_one = (n) => n+1;
+
+  promise_any = (data) => {
+    console.log(data);
+    return new Promise(function(resolve, reject) {
+      resolve(data);
+    });
+  }
+
+  window.lastQuery = '';
+
+  window.checkAndExecuteURLQuery = function() {
+    if (window.location.hash) {
+      const query = decodeURIComponent(window.location.hash.substring(1));
+      if (query) {
+        const waitForConsoleInput = setInterval(() => {
+          const consoleInput = document.querySelector('.tinker-console input[type="text"]') ||
+                              document.querySelector('.tinker-console textarea');
+
+          if (consoleInput && window.tinker && window.tinker.console) {
+            clearInterval(waitForConsoleInput);
+
+            console.log('Console ready, executing query:', query);
+            consoleInput.value = query;
+            window.lastQuery = query;
+
+            setTimeout(() => {
+              // Try to find and call the actual submit function
+              if (window.tinker.console.emit) {
+                window.tinker.console.emit('submit', query);
+              } else if (window.tinker.console.onsubmit) {
+                window.tinker.console.onsubmit(query);
+              } else {
+                // Fallback: simulate Enter event more thoroughly
+                consoleInput.focus();
+                const events = ['keydown', 'keypress', 'keyup'];
+                events.forEach(eventType => {
+                  const evt = new KeyboardEvent(eventType, {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    which: 13,
+                    charCode: 13,
+                    bubbles: true,
+                    cancelable: true
+                  });
+                  consoleInput.dispatchEvent(evt);
+                });
+              }
+              console.log('Query execution attempted');
+            }, 800);
+          }
+        }, 100);
+
+        setTimeout(() => clearInterval(waitForConsoleInput), 10000);
+      }
+    }
+  };
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+
+    window.latexBlocks = [];
+
+    let lastConsoleContent = '';
+    let buttonsAdded = false;
+
+    function extractAllLatexBlocks() {
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) return [];
+
+      const textContent = consoleDiv.textContent || consoleDiv.innerText;
+      const blocks = [];
+
+      const prooftrees = textContent.match(/\\begin\{prooftree\}[\s\S]*?\\end\{prooftree\}/g) || [];
+      const fitches = textContent.match(/\\begin\{fitch\}[\s\S]*?\\end\{fitch\}/g) || [];
+
+      prooftrees.forEach(block => blocks.push({ type: 'prooftree', code: block }));
+      fitches.forEach(block => blocks.push({ type: 'fitch', code: block }));
+
+      return blocks;
+    }
+
+    function addCopyButtonsToConsole() {
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) return;
+
+      const currentContent = consoleDiv.textContent || '';
+
+      if (currentContent === lastConsoleContent) return;
+      lastConsoleContent = currentContent;
+      buttonsAdded = false;
+
+      if (!currentContent.includes('\\begin{prooftree}') && !currentContent.includes('\\begin{fitch}')) {
+        return;
+      }
+
+      window.latexBlocks = extractAllLatexBlocks();
+
+      if (window.latexBlocks.length === 0 || buttonsAdded) return;
+
+      const walker = document.createTreeWalker(
+        consoleDiv,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      const patternsToMatch = [
+        { pattern: /^\\end\{prooftree\}$/m, blockType: 'prooftree' },
+        { pattern: /^\\end\{fitch\}$/m, blockType: 'fitch' }
+      ];
+
+      let prooftreeCount = 0;
+      let fitchCount = 0;
+      let node;
+
+      while (node = walker.nextNode()) {
+        for (const item of patternsToMatch) {
+          if (item.pattern.test(node.textContent)) {
+            const parent = node.parentElement;
+
+            if (parent && !parent.querySelector('.latex-copy-btn')) {
+              const blockIndex = item.blockType === 'prooftree' ? prooftreeCount :
+                                 window.latexBlocks.filter(b => b.type === 'prooftree').length + fitchCount;
+
+              if (item.blockType === 'prooftree') prooftreeCount++;
+              else fitchCount++;
+
+              const span = document.createElement('span');
+              span.className = 'latex-section-marker';
+              span.textContent = node.textContent;
+
+              const btn = document.createElement('button');
+              btn.className = 'latex-copy-btn';
+              btn.textContent = '📋 Copy LaTeX';
+              btn.onclick = function() {
+                copyLatexBlock(blockIndex);
+              };
+
+              span.appendChild(btn);
+              parent.replaceChild(span, node);
+              buttonsAdded = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    function copyLatexBlock(index) {
+      if (window.latexBlocks[index]) {
+        const latex = window.latexBlocks[index].code;
+        navigator.clipboard.writeText(latex).then(() => {
+          alert('LaTeX code copied to clipboard!');
+        }).catch(err => {
+          alert('Failed to copy to clipboard');
+        });
+      }
+    }
+
+      /* ancien code
+    function shareURL() {
+      if (window.lastQuery) {
+        const url = window.location.origin + window.location.pathname + '#' + encodeURIComponent(window.lastQuery);
+        navigator.clipboard.writeText(url).then(() => {
+          alert('Shareable URL copied!\nShare this link to show the same proof.');
+        }).catch(() => {
+          prompt('Copy this URL:', url);
+        });
+      } else {
+        alert('No query to share. Execute a prove() query first.');
+      }
+    }
+      */
+
+function shareURL() {
+      // 1. Tenter de lire la valeur actuelle du champ de saisie
+      const consoleInput = document.querySelector('.tinker-console input[type="text"]') ||
+                           document.querySelector('.tinker-console textarea');
+      // Commencer par la valeur trimée de l'input, ou une chaîne vide
+      let query = consoleInput ? consoleInput.value.trim() : '';
+
+      // 2. LOGIQUE DE REPLI : Si l'input est vide, on utilise la dernière requête exécutée (window.lastQuery)
+      if (!query && window.lastQuery) {
+          query = window.lastQuery;
+      }
+
+      // 3. Procéder UNIQUEMENT si une requête valide existe (actuelle ou en mémoire)
+      if (query) {
+        // Mettre à jour lastQuery pour garantir la synchronisation
+        window.lastQuery = query;
+
+        // Encodage de la requête complète (garantit le point et les parenthèses finales)
+        const url = window.location.origin + window.location.pathname + '#' + encodeURIComponent(query);
+
+        navigator.clipboard.writeText(url).then(() => {
+          alert('Shareable URL copied!\nShare this link to show the same proof.');
+        }).catch(() => {
+          prompt('Copy this URL:', url);
+        });
+      } else {
+        alert('No query to share. Execute a prove() query first.');
+      }
+    }
+
+
+    setInterval(addCopyButtonsToConsole, 1000);
+
+    // ===== FONCTION MathJax AVEC ANTI-CLIGNOTEMENT =====
+    
+    let lastRenderedContent = {
+      sequent: '',
+      tree: ''
+    };
+    
+    let isRendering = false;
+    
+    function renderBussproofsWithMathJax() {
+      if (isRendering) return;
+      
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) return;
+
+      const textContent = consoleDiv.textContent || consoleDiv.innerText;
+      if (!textContent.includes('\\begin{prooftree}')) return;
+
+      if (typeof MathJax === 'undefined' || !MathJax.typesetPromise) {
+        console.log('⏳ MathJax not ready yet');
+        return;
+      }
+
+      function extractAndRender(sectionTitle, startMarker, endMarker, containerId, cacheKey) {
+        const startMatch = textContent.match(startMarker);
+        if (!startMatch) {
+          const container = document.getElementById(containerId);
+          if (container) {
+            container.remove();
+            lastRenderedContent[cacheKey] = '';
+          }
+          return;
+        }
+
+        const startPos = textContent.indexOf(startMatch[0]);
+        let endPos;
+
+        if (endMarker) {
+          const endMatch = textContent.substring(startPos).search(endMarker);
+          endPos = endMatch !== -1 ? startPos + endMatch : textContent.length;
+        } else {
+          endPos = textContent.length;
+        }
+
+        const sectionText = textContent.substring(startPos, endPos);
+        const prooftreeMatches = sectionText.match(/\\begin\{prooftree\}[\s\S]*?\\end\{prooftree\}/g);
+
+        if (prooftreeMatches && prooftreeMatches.length > 0) {
+          const contentSignature = prooftreeMatches.join('|||');
+          
+          if (lastRenderedContent[cacheKey] === contentSignature) {
+            return;
+          }
+          
+          isRendering = true;
+          
+          let container = document.getElementById(containerId);
+          if (!container) {
+            container = document.createElement('div');
+            container.id = containerId;
+            container.className = 'mathjax-proof-container';
+            container.style.opacity = '0';
+            consoleDiv.appendChild(container);
+          }
+
+          let mathContent = '<h4>' + sectionTitle + '</h4>';
+          prooftreeMatches.forEach((proof, idx) => {
+            mathContent += '<div>$$' + proof + '$$</div>';
+            if (idx < prooftreeMatches.length - 1) {
+              mathContent += '<div style="height: 2em;"></div>';
+            }
+          });
+
+          container.innerHTML = mathContent;
+
+          MathJax.typesetPromise([container]).then(() => {
+            container.style.transition = 'opacity 0.3s ease-in';
+            container.style.opacity = '1';
+            lastRenderedContent[cacheKey] = contentSignature;
+            console.log('✅ MathJax rendered:', sectionTitle);
+            isRendering = false;
+          }).catch((err) => {
+            console.error('❌ MathJax error:', err);
+            container.style.opacity = '1';
+            isRendering = false;
+          });
+        }
+      }
+
+      extractAndRender(
+        'G4 Sequent Calculus',
+        /[-\s]*Sequent\s+Calculus\s*[-\s]*/i,
+        /[-\s]*Natural\s+Deduction\s*[-\s]*/i,
+        'mathjax-sequent-container',
+        'sequent'
+      );
+
+      extractAndRender(
+        'Tree-style Natural Deduction',
+        /Tree[\s-]*style/i,
+        null,
+        'mathjax-tree-container',
+        'tree'
+      );
+    }
+
+    // Observer et setTimeout automatiques DÉSACTIVÉS en mode manuel
+    // Décommenter ces lignes pour revenir au mode automatique :
+    /*
+    let renderTimeout;
+    const renderObserver = new MutationObserver(() => {
+      clearTimeout(renderTimeout);
+      renderTimeout = setTimeout(renderBussproofsWithMathJax, 1000);
+    });
+
+    const consoleDiv = document.querySelector('.tinker-console');
+    if (consoleDiv) {
+      renderObserver.observe(consoleDiv, { 
+        childList: true, 
+        subtree: true
+      });
+    }
+
+    setTimeout(renderBussproofsWithMathJax, 2000);
+    */
+    // ===== FIN FONCTION MathJax =====
+
+    // ===== CONTRÔLE MANUEL MathJax via Ctrl+M =====
+    let mathJaxManualMode = true;  // Mode manuel activé par défaut
+    let mathJaxCurrentlyVisible = false;  // MathJax invisible au départ
+    
+    console.log('🎨 MathJax en mode MANUEL - Utilisez Ctrl+M ou Cmd+M pour activer/désactiver');
+    // ===== FIN CONTRÔLE MANUEL =====
+
+
+    function getLatexByStyle(style) {
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) {
+        console.error('❌ No console div found');
+        return null;
+      }
+
+      const textContent = consoleDiv.textContent || consoleDiv.innerText;
+      console.log('📝 Console text length:', textContent.length);
+      console.log('🔍 Looking for style:', style);
+
+      // Debug: afficher les sections trouvées
+      const hasSequent = textContent.search(/sequent/i) !== -1;
+      const hasFitch = textContent.search(/fitch/i) !== -1;
+      const hasTree = textContent.search(/tree/i) !== -1;
+      console.log('📌 Sections detected: Sequent=' + hasSequent + ', Fitch=' + hasFitch + ', Tree=' + hasTree);
+
+      if (style === 'sequent') {
+        // Pour sequent: prendre uniquement entre "Sequent" et "Natural Deduction" ou "Fitch"
+        // Chercher la section explicitement marquée "Sequent Calculus"
+
+        const sequentStartMatch = textContent.match(/[-\s]*Sequent\s+Calculus\s*[-\s]*/i);
+        if (!sequentStartMatch) {
+          console.error('❌ No "Sequent Calculus" marker found');
+          return null;
+        }
+
+        const sequentStart = textContent.indexOf(sequentStartMatch[0]);
+        console.log('📍 Sequent starts at position:', sequentStart);
+
+        // Trouver où se termine la section Sequent (avant "Natural Deduction" ou "Fitch")
+        const naturalDeductionMatch = textContent.substring(sequentStart).search(/[-\s]*Natural\s+Deduction\s*[-\s]*/i);
+        const fitchMatch = textContent.substring(sequentStart).search(/[-\s]*a\)\s*Fitch\s+Style/i);
+
+        let sequentEnd;
+        if (naturalDeductionMatch !== -1) {
+          sequentEnd = sequentStart + naturalDeductionMatch;
+          console.log('📍 Natural Deduction found at:', sequentEnd);
+        } else if (fitchMatch !== -1) {
+          sequentEnd = sequentStart + fitchMatch;
+          console.log('📍 Fitch found at:', sequentEnd);
+        } else {
+          console.error('❌ Cannot find end of Sequent section');
+          return null;
+        }
+
+        const sequentText = textContent.substring(sequentStart, sequentEnd);
+        console.log('✓ Sequent section extracted (length:', sequentText.length + ')');
+
+        const treeMatches = sequentText.match(/\\begin\{prooftree\}[\s\S]*?\\end\{prooftree\}/g);
+        console.log('🌳 Sequent prooftree blocks found:', treeMatches ? treeMatches.length : 0);
+
+        if (treeMatches && treeMatches.length > 0) {
+          console.log('✅ Returning', treeMatches.length, 'sequent proofs');
+          return treeMatches.join('\n\n\\vspace{1cm}\n\n');
+        }
+        console.error('❌ No prooftree blocks in Sequent section');
+        return null;
+
+      } else if (style === 'fitch') {
+        // Pour Fitch: chercher entre "Fitch" et "Tree"
+        const fitchMatch = textContent.match(/Fitch[\s-]*style[\s\S]*?(?=(?:Tree[\s-]*style|$))/i);
+        console.log('📋 Fitch match:', fitchMatch ? 'found' : 'not found');
+
+        if (!fitchMatch) {
+          console.error('❌ No Fitch section found');
+          return null;
+        }
+
+        const fitchMatches = fitchMatch[0].match(/\\begin\{fitch\}[\s\S]*?\\end\{fitch\}/g);
+        console.log('📊 Fitch blocks found:', fitchMatches ? fitchMatches.length : 0);
+
+        if (!fitchMatches) {
+          console.error('❌ No fitch LaTeX blocks in Fitch section');
+          return null;
+        }
+
+        console.log('✅ Returning', fitchMatches.length, 'Fitch proofs');
+        return fitchMatches.map(fitch => '\\begin{center}\n' + fitch + '\n\\end{center}').join('\n\n\\vspace{1cm}\n\n');
+
+      } else if (style === 'tree') {
+        // Pour Tree: chercher après "Tree-style" ou "Natural deduction" (Tree)
+        const treeMatch = textContent.match(/Tree[\s-]*style[\s\S]*$/i);
+        console.log('🌲 Tree match:', treeMatch ? 'found' : 'not found');
+
+        if (!treeMatch) {
+          console.error('❌ No Tree section found');
+          return null;
+        }
+
+        const treeMatches = treeMatch[0].match(/\\begin\{prooftree\}[\s\S]*?\\end\{prooftree\}/g);
+        console.log('🌳 Tree prooftree blocks found:', treeMatches ? treeMatches.length : 0);
+
+        if (treeMatches && treeMatches.length > 0) {
+          console.log('✅ Returning', treeMatches.length, 'Tree proofs');
+          return treeMatches.join('\n\n\\vspace{1cm}\n\n');
+        }
+        return null;
+      }
+
+      return null;
+    }
+
+    // Fonction utilitaire pour debug: afficher le contenu de la console
+    window.debugConsoleContent = function() {
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) {
+        console.log('No console div');
+        return;
+      }
+
+      const text = consoleDiv.textContent;
+      console.log('=== CONSOLE CONTENT DEBUG ===');
+      console.log('Total length:', text.length);
+
+      // Trouver les marqueurs
+      const markers = ['sequent', 'Sequent', 'Fitch', 'fitch', 'Tree', 'tree'];
+      markers.forEach(marker => {
+        const idx = text.indexOf(marker);
+        if (idx !== -1) {
+          console.log(`\n"${marker}" found at position ${idx}:`);
+          console.log(text.substring(Math.max(0, idx - 30), Math.min(text.length, idx + 80)));
+        }
+      });
+
+      // Compter les blocs LaTeX
+      const prooftrees = (text.match(/\\begin\{prooftree\}/g) || []).length;
+      const fitches = (text.match(/\\begin\{fitch\}/g) || []).length;
+      console.log(`\nLaTeX blocks: ${prooftrees} prooftree(s), ${fitches} fitch block(s)`);
+
+      // Tester les extractions
+      console.log('\n=== TESTING EXTRACTIONS ===');
+      console.log('Sequent:', getLatexByStyle('sequent') ? '✓ OK' : '✗ FAIL');
+      console.log('Fitch:', getLatexByStyle('fitch') ? '✓ OK' : '✗ FAIL');
+      console.log('Tree:', getLatexByStyle('tree') ? '✓ OK' : '✗ FAIL');
+    };
+
+    function getAllLatexFromConsole() {
+      const consoleDiv = document.querySelector('.tinker-console');
+      if (!consoleDiv) return null;
+
+      const textContent = consoleDiv.textContent || consoleDiv.innerText;
+
+      const fitchMatches = textContent.match(/\\begin\{fitch\}[\s\S]*?\\end\{fitch\}/g);
+      const treeMatches = textContent.match(/\\begin\{prooftree\}[\s\S]*?\\end\{prooftree\}/g);
+
+      const allLatex = [];
+
+      if (treeMatches) {
+        treeMatches.forEach(tree => allLatex.push(tree));
+      }
+
+      if (fitchMatches) {
+        fitchMatches.forEach(fitch => allLatex.push('\\begin{center}\n' + fitch + '\n\\end{center}'));
+      }
+
+      return allLatex.length > 0 ? allLatex.join('\n\n\\vspace{1cm}\n\n') : null;
+    }
+
+    async function convertProofToPNG(style = 'all') {
+      let latexCode;
+      let styleName;
+
+      if (style === 'all') {
+        latexCode = getAllLatexFromConsole();
+        styleName = 'all_proofs';
+      } else {
+        latexCode = getLatexByStyle(style);
+        styleName = style;
+      }
+
+      if (!latexCode) {
+        alert('No LaTeX proof found for style: ' + style);
+        return;
+      }
+
+      try {
+        const response = await fetch('/wasm/proof_png', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            latex_code: latexCode,
+            style: style
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('HTTP error ' + response.status);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          const pngDiv = document.getElementById('png-display');
+          pngDiv.innerHTML = '';
+          pngDiv.style.display = 'block';
+
+          const closeBtn = document.createElement('span');
+          closeBtn.className = 'close-btn';
+          closeBtn.innerHTML = '×';
+          closeBtn.onclick = () => {
+            pngDiv.innerHTML = '';
+            pngDiv.style.display = 'none';
+          };
+
+          const img = document.createElement('img');
+          img.src = data.image;
+          img.alt = 'Proof as PNG (' + styleName + ')';
+          img.style.cursor = 'pointer';
+          img.onclick = function() {
+            const link = document.createElement('a');
+            link.href = data.image;
+            link.download = 'proof_' + styleName + '_' + Date.now() + '.png';
+            link.click();
+          };
+
+          pngDiv.appendChild(closeBtn);
+          pngDiv.appendChild(img);
+        }
+      } catch (error) {
+        alert('PNG conversion failed for style: ' + style);
+      }
+    }
+
+    window.convertProofToPNG = convertProofToPNG;
+    window.shareProofURL = shareURL;
+
+document.addEventListener('keydown', function(event) {
+      // On Linux/Windows: event.ctrlKey, on Mac: event.metaKey (this covers the Super/Cmd key)
+      const modifierKey = event.ctrlKey || event.metaKey;
+
+      if (!modifierKey) return; // No modifier pressed, ignore
+
+      const key = event.key.toLowerCase();
+
+      // Ctrl/Cmd + I: All proofs as images (PNG)
+      if (key === 'i') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+i (all Images)');
+        convertProofToPNG('all');
+        return;
+      }
+
+      // Ctrl/Cmd + G: Sequent Calculus proofs (G for G4)
+      if (key === 'g') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+g (sequent calculus G4)');
+        convertProofToPNG('sequent');
+        return;
+      }
+
+      // Ctrl/Cmd + V: Flag-style proofs
+      if (key === 'l') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+l (Fitch styLe)');
+        convertProofToPNG('fitch');
+        return;
+      }
+
+      // Ctrl/Cmd + h : Tree-style proofs (h for Horizontal Proof)
+      if (key === 'h') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+h (Tree-style / Horizontal Proof)');
+        convertProofToPNG('tree');
+        return;
+      }
+
+      // Ctrl/Cmd + a: Share URL adress
+      if (key === 'a') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+a (share URL address)');
+        shareURL();
+        return;
+      }
+
+      // Ctrl/Cmd + k: Debug console content (k for ChecK)
+      if (key === 'k') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+k (debug/checK)');
+        if (window.debugConsoleContent) {
+          window.debugConsoleContent();
+        }
+        return;
+      }
+
+      // Ctrl/Cmd + u: Force URL update check (for testing)
+      if (key === 'u') {
+        event.preventDefault();
+        console.log('⌨️  Shortcut triggered: Ctrl/Cmd+L (force URL check)');
+        const input = document.querySelector('.tinker-console input[type="text"]') ||
+                     document.querySelector('.tinker-console textarea');
+        if (input) {
+          console.log('📝 Current input value:', input.value);
+          console.log('🔗 Current URL hash:', window.location.hash);
+        }
+        return;
+      }
+
+      // Ctrl/Cmd + m: Toggle MathJax rendering (Manual mode)
+      if (key === 'm') {
+        event.preventDefault();
+        
+        if (!mathJaxCurrentlyVisible) {
+          // Activer MathJax
+          console.log('⌨️  Ctrl/Cmd+M: Activating MathJax rendering');
+          renderBussproofsWithMathJax();
+          mathJaxCurrentlyVisible = true;
+          console.log('✅ MathJax rendered - Press Ctrl/Cmd+M again to hide');
+        } else {
+          // Désactiver MathJax (supprimer les conteneurs)
+          console.log('⌨️  Ctrl/Cmd+M: Hiding MathJax rendering');
+          const mathContainers = document.querySelectorAll('.mathjax-proof-container');
+          mathContainers.forEach(container => container.remove());
+          mathJaxCurrentlyVisible = false;
+          
+          // Réinitialiser le cache pour permettre un nouveau rendu
+          lastRenderedContent = {
+            sequent: '',
+            tree: ''
+          };
+          
+          console.log('❌ MathJax hidden - Press Ctrl/Cmd+M to render again');
+        }
+        return;
+      }
+    });
+  });
+</script>
+<script>
+  // Solution avec vidage du cache au bon moment
+  setTimeout(() => {
+    const updateURLFromConsole = () => {
+      const inputs = document.querySelectorAll('input[type="text"], textarea');
+      inputs.forEach(input => {
+        if (input.parentElement.closest('.tinker-console') && !input.dataset.urlListener) {
+          input.dataset.urlListener = 'true';
+
+          input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+              const text = this.value.trim();
+              if (text && (text.startsWith('prove(') || text.startsWith('decide('))) {
+                // VIDER LE CACHE après l'exécution
+                setTimeout(() => {
+                  window.latexBlocks = []; // Vide le cache des blocs LaTeX
+                  console.log('🧹 Latex cache cleared after execution');
+                }, 2000); // 2 secondes après l'exécution
+              }
+            }
+          });
+
+          // La logique de mise à jour de l'URL par input a été déplacée/consolidée dans le script "SOLUTION FINALE"
+          /* input.addEventListener('input', function() {
+            setTimeout(() => {
+              const text = this.value.trim();
+              if (text && (text.startsWith('prove(') || text.startsWith('decide('))) {
+                window.location.hash = '#' + encodeURIComponent(text);
+                window.lastQuery = text;
+              }
+            }, 500);
+          }); */
+
+          console.log('✅ URL listener added to console input');
+        }
+      });
+    };
+
+    updateURLFromConsole();
+    setInterval(updateURLFromConsole, 2000);
+  }, 3000);
+</script>
+<script>
+  // SOLUTION FINALE - Détection intelligente URL vs user input
+// À ajouter APRÈS le chargement de Tinker (avant </body>)
+
+(function() {
+  'use strict';
+
+  let lastExecutedQuery = '';
+  let loadedFromURL = false;
+
+  // Détecter si on charge depuis une URL avec hash
+  if (window.location.hash) {
+    loadedFromURL = true;
+    const urlQuery = decodeURIComponent(window.location.hash.substring(1));
+    lastExecutedQuery = urlQuery; // Marquer cette query comme "déjà vue"
+    console.log('🔗 Loading from URL:', urlQuery);
+
+    // Après le chargement réussi, réinitialiser
+    setTimeout(() => {
+      loadedFromURL = false;
+      console.log('✅ URL loading complete, clearing now enabled');
+    }, 8000); // 8 secondes de grâce
+  }
+
+  // Fonction pour vider VRAIMENT la console
+  function clearConsoleOutput() {
+    const consoleDiv = document.querySelector('.tinker-console');
+    if (!consoleDiv) return;
+
+    console.log('🧹 Clearing console...');
+
+    // Méthode 1: Utiliser l'API Tinker si disponible
+    if (window.tinker && window.tinker.console) {
+      if (typeof window.tinker.console.clear === 'function') {
+        window.tinker.console.clear();
+        console.log('✅ Console cleared via Tinker API');
+        return;
+      }
+    }
+
+    // Méthode 2: Supprimer manuellement les éléments de sortie
+    const allChildren = Array.from(consoleDiv.children);
+    allChildren.forEach(child => {
+      // Garder seulement les inputs
+      if (child.tagName !== 'INPUT' && child.tagName !== 'TEXTAREA') {
+        // Vérifier si l'élément contient un input
+        const hasInput = child.querySelector('input, textarea');
+        if (!hasInput) {
+          child.remove();
+        }
+      }
+    });
+
+    console.log('✅ Console cleared manually');
+  }
+
+  // Attacher le listener sur TOUS les inputs de la console
+  function attachClearListener() {
+    const inputs = document.querySelectorAll('.tinker-console input[type="text"], .tinker-console textarea');
+
+    inputs.forEach(input => {
+      if (input.dataset.clearListenerAttached) return;
+      input.dataset.clearListenerAttached = 'true';
+
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          const query = this.value.trim();
+
+          // Si c'est une nouvelle requête prove() ou decide()
+          if (query && (query.startsWith('prove(') || query.startsWith('decide('))) {
+
+            // Mettre à jour l'URL et lastQuery IMMÉDIATEMENT (POINT DE CORRECTION CLÉ)
+            window.lastQuery = query;
+            window.location.hash = '#' + encodeURIComponent(query);
+            console.log('🔗 URL updated on Enter:', window.location.hash);
+
+            // Si c'est différent de la dernière requête exécutée
+            if (query !== lastExecutedQuery) {
+              console.log('🆕 New query detected:', query);
+
+              // IMPORTANT: Ne pas vider si on vient de charger depuis URL
+              if (!loadedFromURL) {
+                console.log('🧹 Clearing console (user typed new query)');
+                // VIDER LA CONSOLE
+                setTimeout(() => {
+                  clearConsoleOutput();
+                }, 10);
+              } else {
+                console.log('⏭️  Skipping clear (loaded from URL)');
+                // Désactiver le flag après cette exécution
+                setTimeout(() => {
+                  loadedFromURL = false;
+                  console.log('✅ URL query executed, clearing now enabled');
+                }, 2000);
+              }
+
+              lastExecutedQuery = query;
+            } else {
+              console.log('↩️  Same query as before, no clear needed');
+            }
+          }
+        }
+      });
+
+      // Aussi mettre à jour l'URL pendant la frappe (debounce)
+      let inputTimeout;
+      input.addEventListener('input', function() {
+        clearTimeout(inputTimeout);
+        inputTimeout = setTimeout(() => {
+          const query = this.value.trim();
+          if (query && (query.startsWith('prove(') || query.startsWith('decide('))) {
+            window.lastQuery = query;
+            window.location.hash = '#' + encodeURIComponent(query);
+            console.log('🔗 URL updated on Input (debounce):', window.location.hash);
+          }
+        }, 800); // ⬅️ DÉLAI DE 800ms pour éviter la troncature
+      });
+
+      console.log('✅ Clear listener attached to input');
+    });
+  }
+
+  // Observer pour ré-attacher quand de nouveaux inputs apparaissent
+  const observer = new MutationObserver(() => {
+    attachClearListener();
+  });
+
+  const consoleDiv = document.querySelector('.tinker-console');
+  if (consoleDiv) {
+    observer.observe(consoleDiv, { childList: true, subtree: true });
+  }
+
+  // Attacher régulièrement
+  setInterval(attachClearListener, 2000);
+
+  // Première tentative
+  setTimeout(attachClearListener, 1000);
+
+  console.log('🚀 Console clearing system initialized with URL protection');
+  })();
+</script>
+<script>
+// CORRESPONDANCE PARENTHÈSES POUR LA CONSOLE
+function checkParenthesesBalance(input) {
+    const value = input.value;
+    const openParens = (value.match(/\(/g) || []).length;
+    const closeParens = (value.match(/\)/g) || []).length;
+    
+    // Retirer les anciennes classes
+    input.classList.remove('parens-unbalanced', 'parens-highlight');
+    
+    // Ajouter la classe appropriée
+    if (openParens !== closeParens) {
+        input.classList.add('parens-unbalanced');
+    }
+    if (value.includes('(') || value.includes(')')) {
+        input.classList.add('parens-highlight');
+    }
+}
+
+function enhanceConsoleInputs() {
+    const inputs = document.querySelectorAll('.tinker-console input[type="text"], .tinker-console textarea, .tinker-input input');
+    
+    inputs.forEach(input => {
+        if (input.hasAttribute('data-parenthesis-enhanced')) return;
+        input.setAttribute('data-parenthesis-enhanced', 'true');
+        
+        // Vérifier immédiatement
+        checkParenthesesBalance(input);
+        
+        // Vérifier à chaque frappe
+        input.addEventListener('input', function() {
+            checkParenthesesBalance(this);
+        });
+    });
+}
+
+// Surveiller en permanence
+setInterval(enhanceConsoleInputs, 1000);
+document.addEventListener('DOMContentLoaded', enhanceConsoleInputs);
+</script>
+
+<script>
+// ===== CHARGEMENT AUTOMATIQUE DE scratch.pl =====
+window.addEventListener('load', function() {
+  console.log('🔍 Recherche de scratch.pl pour chargement par défaut...');
+  
+  // Attendre que le select soit peuplé
+  setTimeout(() => {
+    const fileSelect = document.querySelector('select[name="select-file"]');
+    
+    if (!fileSelect) {
+      console.log('⚠️  Select file not found');
+      return;
+    }
+    
+    // Chercher scratch.pl dans les options
+    let scratchFound = false;
+    for (let i = 0; i < fileSelect.options.length; i++) {
+      const optionText = fileSelect.options[i].text || fileSelect.options[i].value;
+      if (optionText.includes('scratch.pl')) {
+        fileSelect.selectedIndex = i;
+        // Déclencher l'événement change pour charger le fichier
+        fileSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log('✅ scratch.pl chargé par défaut');
+        scratchFound = true;
+        break;
+      }
+    }
+    
+    if (!scratchFound) {
+      console.log('ℹ️  scratch.pl non trouvé dans la liste des fichiers');
+    }
+  }, 1500); // Attendre 1.5 secondes que Tinker initialise les fichiers
+});
+// ===== FIN CHARGEMENT AUTOMATIQUE =====
+</script>
+</body>
+</html>
