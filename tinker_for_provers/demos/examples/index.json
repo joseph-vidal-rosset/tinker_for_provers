@@ -1,0 +1,8 @@
+[
+    { "name": "scratch.pl",
+      "comment": "test your SWI-Prolog files here"
+    },
+      { "name": "fcubeweb.pl",
+    "comment": "A SWI-Prolog prover for intuitionistic propositional logic"
+      }
+]
