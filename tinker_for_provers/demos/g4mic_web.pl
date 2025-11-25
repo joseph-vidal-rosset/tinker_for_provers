@@ -1,12 +1,12 @@
 % =========================================================================
-% OPERATEURS COMMUNS - Module centralise
-% A inclure dans tous les modules du prouveur
+% COMMON OPERATORS - Centralized module
+% To include in all prover modules
 % =========================================================================
 :- use_module(library(lists)).
 :- use_module(library(statistics)).
 :- use_module(library(terms)).
 % =========================================================================
-% OPERATEURS TPTP (syntaxe d'entree)
+% TPTP OPERATORS (input syntax)
 % =========================================================================
 :- op( 500, fy, ~).             % negation
 :- op(1000, xfy, &).            % conjunction
@@ -17,12 +17,12 @@
 :- op( 500, fy, !).             % universal quantifier:  ![X]:
 :- op( 500, fy, ?).             % existential quantifier:  ?[X]:
 :- op( 500, xfy, :).            % quantifier separator
-% Syntaxe d'entree : sequent turnstile
+% Input syntax: sequent turnstile
 % Equivalence operator for sequents (bidirectional provability)
 :- op(800, xfx, <>).
 % =========================================================================
-% OPERATEURS LATEX (sortie formatee)
-% ATTENTION : Respecter exactement les espaces !
+% LATEX OPERATORS (formatted output)
+% ATTENTION: Respect spaces exactly!
 % =========================================================================
 :- op( 500, fy, ' \\lnot ').     % negation
 :- op(1000, xfy, ' \\land ').    % conjunction
@@ -31,47 +31,17 @@
 :- op(1120, xfx, ' \\leftrightarrow ').  % biconditional
 :- op( 500, fy, ' \\forall ').   % universal quantifier
 :- op( 500, fy, ' \\exists ').   % existential quantifier
-:- op( 500, xfy, ' ').           % espace pour quantificateurs
+:- op( 500, xfy, ' ').           % space for quantifiers
 :- op(400, fx, ' \\bot ').      % falsity (#)
-% Syntaxe LaTeX : sequent turnstile  
+% LaTeX syntax: sequent turnstile  
 :- op(1150, xfx, ' \\vdash ').
-% =========================================================================
-% DOCUMENTATION DES OPERATEURS
-% =========================================================================
-
-% Priorites (ordre croissant) :
-% 500  : ~, !, ?, :
-% 1000 : &
-% 1100 : |
-% 1110 : =>
-% 1120 : <=>
-% 1200 : f (?)
-
-% Associativite :
-% fy  : prefixe, associatif a droite (ex: ~ ~p)
-% xfy : infixe, associatif a droite (ex: p & q & r)
-% xfx : infixe, non associatif (ex: p <=> q)
-% fx  : prefixe, non associatif (ex: f)
-
-% Usage dans les modules :
-% :- [operators].  % Inclure en debut de fichier
-% =========================================================================
-% OPERATEURS POUR SEQUENTS - AJOUT
-% =========================================================================
-% =========================================================================
-% UNIFIED OPTIMIZED DRIVER: PATTERN DETECTION + 2-PASS STRATEGY
-% Version with native G4 sequent syntax [Premises] > [Conclusion]
-% =========================================================================
-:- use_module(library(lists)).
-:- use_module(library(statistics)).
-:- use_module(library(terms)).
 % =========================================================================
 % STARTUP BANNER
 % =========================================================================
-% Désactiver le banner automatique de SWI-Prolog
+% Disable automatic SWI-Prolog banner
 :- set_prolog_flag(verbose, silent).
 
-% Puis ton initialisation
+%
 :- initialization(show_banner).
 
 show_banner :-
@@ -101,15 +71,15 @@ logic_iteration_limit(fol, 15).
 % UTILITY for/3
 % =========================================================================
 
-for(I, M, N) :- M =< N, I = M.
-for(I, M, N) :- M < N, M1 is M+1, for(I, M1, N).
+for(Threshold, M, N) :- M =< N, Threshold = M.
+for(Threshold, M, N) :- M < N, M1 is M+1, for(Threshold, M1, N).
 
 % =========================================================================
-% DETECTION THEOREME vs SEQUENT (simplifie)
+% THEOREM vs SEQUENT DETECTION (simplified)
 % =========================================================================
 
 :- dynamic current_proof_sequent/1.
-:- dynamic premise_list/1.
+:- dynamic premiss_list/1.
 
 % =========================================================================
 % OPTIMIZED CLASSICAL PATTERN DETECTION
@@ -244,11 +214,11 @@ is_fol_structural_pattern((_) => ?[_-_]:(_ & ![_-_]:(_ | _))) :- !.
 % MAIN INTERFACE: prove/1
 % =========================================================================
 
-% NOUVEAU : Detection automatique pour sequents avec premisses
+% NEW: Automatic detection for sequents with premisses
 prove(G > D) :-
-    G \= [],  % Premisses non vides = SEQUENT
+    G \= [],  % Non-empty premisses = SEQUENT
     !,
-     %  VALIDATION : Verifier les premisses et la conclusion
+     %  VALIDATION: Verify premisses and conclusion
     validate_sequent_formulas(G, D),
     statistics(runtime, [_T0|_]),
     write('------------------------------------------'), nl,
@@ -258,17 +228,17 @@ prove(G > D) :-
     write('MODE: Sequent '), nl,
     nl,
     
-    % Stocker les premisses pour l'affichage
-    retractall(premise_list(_)),
-    assertz(premise_list(G)),
+    % Store premisses for display
+    retractall(premiss_list(_)),
+    assertz(premiss_list(G)),
     retractall(current_proof_sequent(_)),
     assertz(current_proof_sequent(G > D)),
     
-    % Preparer les formules
+    % Prepare formulas
     copy_term((G > D), (GCopy > DCopy)),
     prepare_sequent_formulas(GCopy, DCopy, PrepG, PrepD),
     
-    % Detecter pattern classique dans la conclusion
+    % Detect classical pattern in conclusion
     ( DCopy = [SingleGoal], is_classical_pattern(SingleGoal) ->
         write('=== CLASSICAL PATTERN DETECTED ==='), nl,
         write('    -> Using classical logic'), nl,
@@ -301,7 +271,7 @@ prove(G > D) :-
 
 % Biconditionals - REGROUPES PAR TYPE
 prove(Left <=> Right) :- !,
-         % VALIDATION : Verifier les deux directions
+         % VALIDATION: Verify both directions
     validate_and_warn(Left, _),
     validate_and_warn(Right, _),
     retractall(current_proof_sequent(_)),
@@ -313,10 +283,10 @@ prove(Left <=> Right) :- !,
     time((decide_silent(Right => Left, Proof2, Logic2))),
     
     nl,
-    write('=== BICONDITIONAL: Proving both directions ==='), nl,
-    output_logic_label(Logic1), nl, nl,
+    write('=== BICONDITIONAL: Proving both directions ==='), nl,nl,
+    % output_logic_label(Logic1), nl, nl,
   %  write('    '), portray_clause(Proof1), nl,nl,
-    output_logic_label(Logic2), nl, nl,
+   %  output_logic_label(Logic2), nl, nl,
   % write('    '), portray_clause(Proof2), nl,nl,
   % write('Q.E.D.'), nl, nl,
     
@@ -355,9 +325,9 @@ prove(Left <=> Right) :- !,
     !.
 
 
-% Equivalence de sequents: [A] <> [B] prouve [A] > [B] ET [B] > [A]
+% Sequent equivalence: [A] <> [B] proves [A] > [B] AND [B] > [A]
 prove([Left] <> [Right]) :- !,
-          % VALIDATION : Verifier les deux formules
+          % VALIDATION: Verify both formulas
     validate_and_warn(Left, _),
     validate_and_warn(Right, _),
     retractall(current_proof_sequent(_)),
@@ -391,13 +361,13 @@ prove([Left] <> [Right]) :- !,
     write('a) Tree Style:'), nl, nl,
     retractall(current_proof_sequent(_)),
     assertz(current_proof_sequent([Left] > [Right])),
-    retractall(premise_list(_)),
-    assertz(premise_list([Left])),
+    retractall(premiss_list(_)),
+    assertz(premiss_list([Left])),
     render_nd_tree_proof(Proof1), nl, nl,
     retractall(current_proof_sequent(_)),
     assertz(current_proof_sequent([Right] > [Left])),
-    retractall(premise_list(_)),
-    assertz(premise_list([Right])),
+    retractall(premiss_list(_)),
+    assertz(premiss_list([Right])),
     render_nd_tree_proof(Proof2), nl, nl,
     write('Q.E.D.'), nl, nl,
 
@@ -406,15 +376,15 @@ prove([Left] <> [Right]) :- !,
     write('\\begin{fitch}'), nl,
     retractall(current_proof_sequent(_)),
     assertz(current_proof_sequent([Left] > [Right])),
-    retractall(premise_list(_)),
-    assertz(premise_list([Left])),
+    retractall(premiss_list(_)),
+    assertz(premiss_list([Left])),
     g4_to_fitch_sequent(Proof1, [Left] > [Right]),
     write('\\end{fitch}'), nl, nl,
     write('\\begin{fitch}'), nl,
     retractall(current_proof_sequent(_)),
     assertz(current_proof_sequent([Right] > [Left])),
-    retractall(premise_list(_)),
-    assertz(premise_list([Right])),
+    retractall(premiss_list(_)),
+    assertz(premiss_list([Right])),
     g4_to_fitch_sequent(Proof2, [Right] > [Left]),
     write('\\end{fitch}'), nl, nl,
     write('Q.E.D.'), nl, nl,
@@ -428,7 +398,7 @@ prove([Left] <> [Right]) :- !,
 
 % Theorems (original logic)
 prove(Formula) :-
-         % VALIDATION : Verifier la formule
+         % VALIDATION: Verify the formula
     validate_and_warn(Formula, _ValidatedFormula),
     statistics(runtime, [_T0|_]),
     write('------------------------------------------'), nl,
@@ -437,7 +407,7 @@ prove(Formula) :-
     write('MODE: Theorem '), nl,
     nl,
     
-    retractall(premise_list(_)),
+    retractall(premiss_list(_)),
     retractall(current_proof_sequent(_)),
     
     copy_term(Formula, FormulaCopy),
@@ -510,7 +480,7 @@ prove(Formula) :-
 % HELPERS
 % =========================================================================
 
-% Preparer une liste de formules
+% Prepare a list of formulas
 prepare_sequent_formulas(GIn, DIn, GOut, DOut) :-
     maplist(prepare_and_subst, GIn, GOut),
     maplist(prepare_and_subst, DIn, DOut).
@@ -520,7 +490,7 @@ prepare_and_subst(F, FOut) :-
     subst_neg(F0, F1),
     subst_bicond(F1, FOut).
 
-% Affichage compact d'un sequent
+% Compact display of a sequent
 write_sequent_compact([], [D]) :- !, write(' |- '), write(D).
 write_sequent_compact([G], [D]) :- !, write(G), write(' |- '), write(D).
 write_sequent_compact(G, [D]) :-
@@ -532,14 +502,14 @@ write_list_compact([X]) :- !, write(X).
 write_list_compact([X|Xs]) :- write(X), write(', '), write_list_compact(Xs).
 
 % =========================================================================
-% VALIDATION DES FORMULES ET SEQUENTS
+% FORMULA AND SEQUENT VALIDATION
 % =========================================================================
 
-% Valider un sequent (premisses + conclusions)
+% Validate a sequent (premisses + conclusions)
 validate_sequent_formulas(G, D) :-
-    % Valider toutes les premisses
-    forall(member(Premise, G), validate_and_warn(Premise, _)),
-    % Valider toutes les conclusions
+    % Validate all premisses
+    forall(member(Premiss, G), validate_and_warn(Premiss, _)),
+    % Validate all conclusions
     forall(member(Conclusion, D), validate_and_warn(Conclusion, _)).
 
 % =========================================================================
@@ -550,25 +520,21 @@ output_proof_results(Proof, LogicType, OriginalFormula, Mode) :-
     extract_formula_from_proof(Proof, Formula),
     detect_and_set_logic_level(Formula),
     output_logic_label(LogicType),
-  %  write('Prolog terms:'), nl, nl,
-  %  write('    '),
     ( catch(
           (copy_term(Proof, ProofCopy),
            numbervars(ProofCopy, 0, _),
-         %  portray_clause(ProofCopy),
            nl, nl),
           error(cyclic_term, _),
           (write('%% WARNING: Cannot represent proof term due to cyclic_term.'), nl, nl)
       ) -> true ; true ),
-   % write('Q.E.D.'), nl, nl,
-    write('- Sequent Calculus -'), nl,nl,
+    write('- Sequent Calculus -'), nl, nl,
     write('\\begin{prooftree}'), nl,
     render_bussproofs(Proof, 0, _),
     write('\\end{prooftree}'), nl, nl,
     write('Q.E.D.'), nl, nl,
     write('- Natural Deduction -'), nl,
-     write('a) Tree Style:'), nl, nl,
-    render_nd_tree_proof(Proof),nl,nl,
+    write('a) Tree Style:'), nl, nl,
+    render_nd_tree_proof(Proof), nl, nl,
     write('Q.E.D.'), nl, nl,
     write('b) Flag Style:'), nl, nl,
     write('\\begin{fitch}'), nl,
@@ -592,69 +558,59 @@ decide_silent(Formula, Proof, Logic) :-
     copy_term(Formula, FormulaCopy),
     prepare(FormulaCopy, [], F0),
     subst_neg(F0, F1),
-    subst_bicond(F1,F2),
+    subst_bicond(F1, F2),
     progressive_proof_silent(F2, Proof, Logic).
 
 progressive_proof_silent(Formula, Proof, Logic) :-
-    ( provable_at_level([] > [Formula], constructive, Proof) ->
-        Logic = constructive
+    ( provable_at_level([] > [Formula], minimal, Proof) ->
+        Logic = minimal
+    ; provable_at_level([] > [Formula], intuitionistic, Proof) ->
+        Logic = intuitionistic
     ; provable_at_level([] > [Formula], classical, Proof) ->
         Logic = classical
     ).
 
 % =========================================================================
-% PROVABILITY AT A GIVEN LEVEL (simplifie)
+% PROVABILITY AT A GIVEN LEVEL
 % =========================================================================
+
 provable_at_level(Sequent, constructive, P) :-
     !,
     logic_iteration_limit(constructive, MaxIter),
-    for(I, 0, MaxIter),
-    Sequent = (G > D),
-    ( prove(G > D, [], I, 1, _, minimal, P) -> true    % <- Essayer minimal d'abord
-    ; prove(G > D, [], I, 1, _, intuitionistic, P)     % <- Puis intuitionistic si echec
+    for(Threshold, 0, MaxIter),
+    Sequent = (Gamma > Delta),
+    ( prove(Gamma > Delta, [], Threshold, 1, _, minimal, P) -> true    % <- Essayer minimal d'abord
+    ; prove(Gamma > Delta, [], Threshold, 1, _, intuitionistic, P)     % <- Then intuitionistic if failure
     ),
     !.
 
-provable_at_level(Sequent, LogicLevel, P) :-
+provable_at_level(Sequent, LogicLevel, Proof) :-
     logic_iteration_limit(LogicLevel, MaxIter),
-    for(I, 0, MaxIter),
-    Sequent = (G > D),
-    prove(G > D, [], I, 1, _, LogicLevel, P),
-    !.
-
-
-provable_at_level(Sequent, constructive, P) :-
-    !,
-    logic_iteration_limit(constructive, MaxIter),
-    for(I, 0, MaxIter),
-    Sequent = (G > D),
-    ( prove(G > D, [], I, 1, _, minimal, P) -> true    % <- Essayer minimal d'abord
-    ; prove(G > D, [], I, 1, _, intuitionistic, P)     % <- Puis intuitionistic si echec
-    ),
+    for(Threshold, 0, MaxIter),
+    Sequent = (Gamma > Delta),
+    prove(Gamma > Delta, [], Threshold, 1, _, LogicLevel, Proof),
     !.
 
 % =========================================================================
 % DISPLAY HELPERS
 % =========================================================================
+
 % Helper: prove sequent silently (for <> operator)
 prove_sequent_silent(Sequent, Proof, Logic) :-
-    Sequent = (G > D),
-    prepare_sequent_formulas(G, D, PrepG, PrepD),
-    ( member(SingleGoal, PrepD), is_classical_pattern(SingleGoal) ->
-        provable_at_level(PrepG > PrepD, classical, Proof),
+    Sequent = (Gamma > Delta),
+    prepare_sequent_formulas(Gamma, Delta, PrepGamma, PrepDelta),
+    ( member(SingleGoal, PrepDelta), is_classical_pattern(SingleGoal) ->
+        provable_at_level(PrepGamma > PrepDelta, classical, Proof),
         Logic = classical
-    ; provable_at_level(PrepG > PrepD, minimal, Proof) ->
+    ; provable_at_level(PrepGamma > PrepDelta, minimal, Proof) ->
         Logic = minimal
-    ; provable_at_level(PrepG > PrepD, constructive, Proof) ->
-        ( proof_uses_lbot(Proof) -> Logic = intuitionistic ; Logic = intuitionistic )
+    ; provable_at_level(PrepGamma > PrepDelta, intuitionistic, Proof) ->
+        Logic = intuitionistic
     ;
-        provable_at_level(PrepG > PrepD, classical, Proof),
+        provable_at_level(PrepGamma > PrepDelta, classical, Proof),
         Logic = classical
     ).
 
-output_logic_label(constructive) :-
-    nl,
-    write('G4 Proofs:'), nl, nl.
 output_logic_label(minimal) :- 
     write('G4 proofs in minimal logic'), nl, nl.
 output_logic_label(intuitionistic) :- 
@@ -668,19 +624,22 @@ proof_uses_lbot(Term) :-
     Term =.. [_|Args],
     member(Arg, Args),
     proof_uses_lbot(Arg).
-
 % =========================================================================
 % MINIMAL INTERFACE decide/1
 % =========================================================================
 
 decide(Left <=> Right) :- !,
-         %  VALIDATION
+    % VALIDATION
     validate_and_warn(Left, _),
     validate_and_warn(Right, _),
     time((
-        decide_silent(Left => Right, _, _),
-        decide_silent(Right => Left, _, _)
+        decide_silent(Left => Right, _, Logic1),
+        decide_silent(Right => Left, _, Logic2)
     )),
+    write('Direction 1 ('), write(Left => Right), write(') is valid in '), 
+    write(Logic1), write(' logic'), nl,
+    write('Direction 2 ('), write(Right => Left), write(') is valid in '), 
+    write(Logic2), write(' logic'), nl,
     !.
 
 decide(Formula) :-
@@ -689,44 +648,54 @@ decide(Formula) :-
     subst_neg(F0, F1),
     subst_bicond(F1,F2),
     ( is_classical_pattern(F2) ->
-        time(provable_at_level([] > [F2], classical, _))
+        time(provable_at_level([] > [F2], classical, _)),
+        write('Valid in classical logic'), nl
     ;
-        time(progressive_proof_silent(F2, _, _))
+        time(progressive_proof_silent(F2, _, Logic)),
+        write('Valid in '), write(Logic), write(' logic'), nl
     ),
     !.
 
 % decide/1 for sequents
 decide(G > D) :-
     G \= [], !,
-       %  VALIDATION
+    % VALIDATION
     validate_sequent_formulas(G, D),
     copy_term((G > D), (GCopy > DCopy)),
     prepare_sequent_formulas(GCopy, DCopy, PrepG, PrepD),
     
     ( DCopy = [SingleGoal], is_classical_pattern(SingleGoal) ->
-        time(provable_at_level(PrepG > PrepD, classical, _))
-    ;
-        ( time(provable_at_level(PrepG > PrepD, minimal, _)) ->
-            true
-        ; time(provable_at_level(PrepG > PrepD, constructive, _)) ->
-            true
-        ;
-            time(provable_at_level(PrepG > PrepD, classical, _))
+        time(provable_at_level(PrepG > PrepD, classical, _)),
+        write('Valid in classical logic'), nl
+    ; time(provable_at_level(PrepG > PrepD, minimal, _)) ->
+        write('Valid in minimal logic'), nl
+    ; time(provable_at_level(PrepG > PrepD, constructive, Proof)) ->
+        ( proof_uses_lbot(Proof) -> 
+            write('Valid in intuitionistic logic'), nl
+        ; 
+            write('Valid in intuitionistic logic'), nl
         )
+    ;
+        time(provable_at_level(PrepG > PrepD, classical, _)),
+        write('Valid in classical logic'), nl
     ),
     !.
 
-% Equivalence pour decide
+% Equivalence for decide
 decide([Left] <> [Right]) :- !,
-         %  VALIDATION
+    % VALIDATION
     validate_and_warn(Left, _),
     validate_and_warn(Right, _),
     time((
-        decide([Left] > [Right]),
-        decide([Right] > [Left])
+        prove_sequent_silent([Left] > [Right], _, Logic1),
+        prove_sequent_silent([Right] > [Left], _, Logic2)
     )),
+    write('Direction 1 ('), write(Left), write(' |- '), write(Right), write(') is valid in '), 
+    write(Logic1), write(' logic'), nl,
+    write('Direction 2 ('), write(Right), write(' |- '), write(Left), write(') is valid in '), 
+    write(Logic2), write(' logic'), nl,
     !.
- 
+
 % =========================================================================
 % HELP SYSTEM
 % =========================================================================
@@ -749,7 +718,7 @@ help :-
     write('    prove([p => q, p] > [q]).         - Modus Ponens in sequent form'), nl,
     write('  BICONDITIONALS:'), nl,
     write('    prove(p <=> ~ ~ p).                - Biconditional of Double Negation '), nl,
-    write('    prove([p] <> [~ ~ p]).             - Bi-implication of Double Negation (sequents)'), nl,
+    write('    prove(p <> ~ ~ p).                 - Bi-implication of Double Negation (sequents)'), nl,
     write('## COMMON MISTAKES '), nl,
     write('   [p] => [p]          - WRONG (use > for sequents)'), nl,
     write('   [p] > [p]           - CORRECT (sequent syntax)'), nl,
@@ -779,75 +748,6 @@ examples :-
     write('  % Drinker Paradox (classical)'), nl,
     write('  ?- prove(?[y]:(d(y) => ![x]:d(x))).'), nl,
     nl.
-
-% ============================================
-% DRIVER - Test Suite Runner with Timer
-% ============================================
-
-%! run_all_test_files
-%  Execute l'integralite de la suite de tests avec mesure du temps
-%  Inclut : tests unitaires, sequents FOL/Prop, Pelletier
-run_all_test_files :- 
-    get_time(StartTime),
-    writeln(''),
-    writeln('##############################################'),
-    writeln('#   START OF THE COMPLETE SERIES OF TESTS    #'),
-    writeln('##############################################'),
-    format('Start : ~w~n~n', [StartTime]),
-    
-    safe_run(run_all_tests, ' FOL Theorems '),
-    safe_run(run_prop_seq, 'Propositional sequents'),
-    safe_run(run_fol_seq, 'FOL Valid Sequents'),
-    safe_run(run_pelletier, 'Pelletier Problems'),
-    
-    get_time(EndTime),
-    ElapsedTime is EndTime - StartTime,
-    
-    writeln(''),
-    writeln('##############################################'),
-    writeln('#    END OF THE COMPLETE SERIES OF TESTS     #'),
-    writeln('##############################################'),
-    format_execution_time(ElapsedTime),
-    writeln('').
-
-%! safe_run(+Goal, +Name)
-%  Execute un predicat de test avec gestion d'erreurs et chronometre
-safe_run(Goal, Name) :-
-    format('~n--- ~w ---~n', [Name]),
-    get_time(Start),
-    catch(
-        (call(Goal) -> 
-            (get_time(End), 
-             Duration is End - Start,
-             format('? ~w : SUCCES (~2f secondes)~n', [Name, Duration])) 
-        ; 
-            (get_time(End), 
-             Duration is End - Start,
-             format('? ~w : ECHEC (~2f secondes)~n', [Name, Duration]))
-        ),
-        Error,
-        (get_time(End), 
-         Duration is End - Start,
-         format('? ~w : ERREUR - ~w (~2f secondes)~n', [Name, Error, Duration]))
-    ).
-
-%! format_execution_time(+Seconds)
-%  Affiche le temps d'execution dans un format lisible
-format_execution_time(Seconds) :-
-    Seconds < 60,
-    !,
-    format('Temps total d\'execution : ~2f secondes~n', [Seconds]).
-format_execution_time(Seconds) :-
-    Seconds < 3600,
-    !,
-    Minutes is floor(Seconds / 60),
-    RemainingSeconds is Seconds - (Minutes * 60),
-    format('Temps total d\'execution : ~d min ~2f sec~n', [Minutes, RemainingSeconds]).
-format_execution_time(Seconds) :-
-    Hours is floor(Seconds / 3600),
-    RemainingMinutes is floor((Seconds - (Hours * 3600)) / 60),
-    RemainingSeconds is Seconds - (Hours * 3600) - (RemainingMinutes * 60),
-    format('Temps total d\'execution : ~d h ~d min ~2f sec~n', [Hours, RemainingMinutes, RemainingSeconds]).
 % =========================================================================
 % END OF DRIVER
 % =========================================================================
@@ -861,7 +761,7 @@ subst_bicond(A <=> B, (A1 => B1) & (B1 => A1)) :-
     subst_bicond(A, A1),
     subst_bicond(B, B1).
 
-% Quantificateurs : passer recursivement dans le corps
+% Quantifiers: pass recursively into the body
 subst_bicond(![Z-X]:A, ![Z-X]:A1) :-
         !,
         subst_bicond(A, A1).
@@ -870,7 +770,7 @@ subst_bicond(?[Z-X]:A, ?[Z-X]:A1) :-
         !,
         subst_bicond(A, A1).
 
-% Connecteurs propositionnels
+% Propositional connectives
 subst_bicond(A & B, A1 & B1) :-
         !,
         subst_bicond(A, A1),
@@ -890,11 +790,11 @@ subst_bicond(~A, ~A1) :-
         !,
         subst_bicond(A, A1).
 
-% Cas de base : formules atomiques
+% Base case: atomic formulas
 subst_bicond(A, A).
 
 % =========================================================================
-% SUBSTITUTION DE LA NEGATION (pretraitement)
+% NEGATION SUBSTITUTION (preprocessing)
 % =========================================================================
 % Double negation
 subst_neg(~ ~A, ((A1 => #) => #)) :-
@@ -952,193 +852,198 @@ subst_neg(A, A).
 % AXIOMS
 %=========================================================================
 % O.0 Ax 
-prove(G > D, _, _, J, J, _, ax(G>D, ax)) :-
-    member(A, G),
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, ax(Gamma>Delta, ax)) :-
+    member(A, Gamma),
     A\=(_&_),
     A\=(_|_),
     A\=(_=>_),
     A\=(!_),
     A\=(?_),
-    D = [B],
+    Delta = [B],
     unify_with_occurs_check(A, B).
 % 0.1 L-bot
-prove(G>D, _, _, J, J, LogicLevel, lbot(G>D, #)) :-
+prove(Gamma>Delta, _, _, SkolemIn, SkolemIn, LogicLevel, lbot(Gamma>Delta, #)) :-
     member(LogicLevel, [intuitionistic, classical]),
-    member(#, G), !.
+    member(#, Gamma), !.
 % =========================================================================
 %  PROPOSITIONAL RULES
 % =========================================================================
 % 1. L&
-prove(G>D, FV, I, J, K, LogicLevel, land(G>D,P)) :-
-    select((A&B),G,G1), !,
-    prove([A,B|G1]>D, FV, I, J, K, LogicLevel, P).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, land(Gamma>Delta,P)) :-
+    select((A&B),Gamma,G1), !,
+    prove([A,B|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % 2. L0->  
-prove(G>D, FV, I, J, K, LogicLevel, l0cond(G>D,P)) :-
-    select((A=>B),G,G1),
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, l0cond(Gamma>Delta,P)) :-
+    select((A=>B),Gamma,G1),
     member(A,G1), !,
-    prove([B|G1]>D, FV, I, J, K, LogicLevel, P).
+    prove([B|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % 2. L&->
-prove(G>D, FV, I, J, K, LogicLevel, landto(G>D,P)) :-
-    select(((A&B)=>C),G,G1), !,
-    prove([(A=>(B => C))|G1]>D, FV, I, J, K, LogicLevel, P).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, landto(Gamma>Delta,P)) :-
+    select(((A&B)=>C),Gamma,G1), !,
+    prove([(A=>(B => C))|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % 3. TNE : Odd Negation Elimination
-prove(G>D, FV, I, J, K, LogicLevel, tne(G>D, P)) :-
-    D = [(A => B)],  % Goal: not-A
-    % Search in G for a formula with more negations
-    member(LongNeg, G),
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, tne(Gamma>Delta, P)) :-
+    Delta = [(A => B)],  % Goal: not-A
+    % Search in Gamma for a formula with more negations
+    member(LongNeg, Gamma),
     % Verify that LongNeg = not^n(not-A) with n >= 2 (so total >= 3)
     is_nested_negation(LongNeg, A => B, Depth),
     Depth >= 2,  % At least 2 more negations than the goal
     !,
-    prove([A|G]>[B], FV, I, J, K, LogicLevel, P).
+    prove([A|Gamma]>[B], FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % 7. IP (Indirect Proof - THE classical law). 
-prove(G>D, FV, I, J, K, classical, ip(G>D, P)) :-
-    D = [A],  % Any goal A (not just bottom)
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, classical, ip(Gamma>Delta, P)) :-
+    Delta = [A],  % Any goal A (not just bottom)
     A \= #,   % Not already bottom
-    \+ member((A => #), G),  % not-A not already in context
-    I > 0,
-    prove([(A => #)|G]>[#], FV, I, J, K, classical, P).
+    \+ member((A => #), Gamma),  % not-A not already in context
+    Threshold > 0,
+    prove([(A => #)|Gamma]>[#], FreeVars, Threshold, SkolemIn, SkolemOut, classical, P).
 % 4. Lv-> (OPTIMIZED)
-prove(G>D, FV, I, J, K, LogicLevel, lorto(G>D,P)) :-
-    select(((A|B)=>C),G,G1), !,
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, lorto(Gamma>Delta,P)) :-
+    select(((A|B)=>C),Gamma,G1), !,
     % Check which disjuncts are present
     ( member(A, G1), member(B, G1) ->
         % Both present: keep both (rare case)
-        prove([A=>C,B=>C|G1]>D, FV, I, J, K, LogicLevel, P)
+        prove([A=>C,B=>C|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
     ; member(A, G1) ->
         % Only A present: keep only A=>C
-        prove([A=>C|G1]>D, FV, I, J, K, LogicLevel, P)
+        prove([A=>C|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
     ; member(B, G1) ->
         % Only B present: keep only B=>C
-        prove([B=>C|G1]>D, FV, I, J, K, LogicLevel, P)
+        prove([B=>C|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
     ;
         % Neither present: keep both (default behavior)
-        prove([A=>C,B=>C|G1]>D, FV, I, J, K, LogicLevel, P)
+        prove([A=>C,B=>C|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
     ).
 % 5. Lv (fallback for all logics including minimal)
-prove(G>D, FV, I, J, K, LogicLevel, lor(G>D, P1,P2)) :-
-    select((A|B),G,G1), !,
-    prove([A|G1]>D, FV, I, J, J1, LogicLevel, P1),
-    prove([B|G1]>D, FV, I, J1, K, LogicLevel, P2).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, lor(Gamma>Delta, P1,P2)) :-
+    select((A|B),Gamma,G1), !,
+    prove([A|G1]>Delta, FreeVars, Threshold, SkolemIn, J1, LogicLevel, P1),
+    prove([B|G1]>Delta, FreeVars, Threshold, J1, SkolemOut, LogicLevel, P2).
 % 13. R-forall 
-prove(G > D, FV, I, J, K, LogicLevel, rall(G>D, P)) :-
-    select((![_Z-X]:A), D, D1), !,
-    copy_term((X:A,FV), (f_sk(J,FV):A1,FV)),
-    J1 is J+1,
-    prove(G > [A1|D1], FV, I, J1, K, LogicLevel, P).
+prove(Gamma > Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, rall(Gamma>Delta, P)) :-
+    select((![_Z-X]:A), Delta, D1), !,
+    copy_term((X:A,FreeVars), (f_sk(SkolemIn,FreeVars):A1,FreeVars)),
+    J1 is SkolemIn+1,
+    prove(Gamma > [A1|D1], FreeVars, Threshold, J1, SkolemOut, LogicLevel, P).
 % 14. L-forall 
-prove(G > D, FV, I, J, K, LogicLevel, lall(G>D, P)) :-
-    member((![_Z-X]:A), G),
-    length(FV, Len), Len < I,  
-    copy_term((X:A,FV), (Y:A1,FV)),
-    prove([A1|G] > D, [Y|FV], I, J, K, LogicLevel, P), !.
+prove(Gamma > Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, lall(Gamma>Delta, P)) :-
+    member((![_Z-X]:A), Gamma),
+    length(FreeVars, Len), Len < Threshold,  
+    copy_term((X:A,FreeVars), (Y:A1,FreeVars)),
+    prove([A1|Gamma] > Delta, [Y|FreeVars], Threshold, SkolemIn, SkolemOut, LogicLevel, P), !.
 % 8. R-> 
-prove(G>D, FV, I, J, K, LogicLevel, rcond(G>D,P)) :-
-    D = [A=>B], !,
-    prove([A|G]>[B], FV, I, J, K, LogicLevel, P).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, rcond(Gamma>Delta,P)) :-
+    Delta = [A=>B], !,
+    prove([A|Gamma]>[B], FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % 6. L->-> 
-prove(G>D, FV, I, J, K, LogicLevel, ltoto(G>D,P1,P2)) :-
-    select(((A=>B)=>C),G,G1), !,
-    prove([A,(B=>C)|G1]>[B], FV, I, J, _J1, LogicLevel, P1),
-    prove([C|G1]> D, FV, I, _K1, K, LogicLevel, P2).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, ltoto(Gamma>Delta,P1,P2)) :-
+    select(((A=>B)=>C),Gamma,G1), !,
+    prove([A,(B=>C)|G1]>[B], FreeVars, Threshold, SkolemIn, _J1, LogicLevel, P1),
+    prove([C|G1]> Delta, FreeVars, Threshold, _K1, SkolemOut, LogicLevel, P2).
 % 9 LvExists  (Quantification Rule Exception: must be *before* Rv)
-prove(G>D, FV, I, J, K, LogicLevel, lex_lor(G>D, P1, P2)) :-
-    select((?[_Z-X]:(A|B)), G, G1), !,
-    copy_term((X:(A|B),FV), (f_sk(J,FV):(A1|B1),FV)),
-    J1 is J+1,
-    prove([A1|G1]>D, FV, I, J1, J2, LogicLevel, P1),
-    prove([B1|G1]>D, FV, I, J2, K, LogicLevel, P2).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, lex_lor(Gamma>Delta, P1, P2)) :-
+    select((?[_Z-X]:(A|B)), Gamma, G1), !,
+    copy_term((X:(A|B),FreeVars), (f_sk(SkolemIn,FreeVars):(A1|B1),FreeVars)),
+    J1 is SkolemIn+1,
+    prove([A1|G1]>Delta, FreeVars, Threshold, J1, J2, LogicLevel, P1),
+    prove([B1|G1]>Delta, FreeVars, Threshold, J2, SkolemOut, LogicLevel, P2).
 % 10. R? 
-prove(G>D, FV, I, J, K, LogicLevel, ror(G>D, P)) :-
-    D = [(A|B)], !,
-    (   prove(G>[A], FV, I, J, K, LogicLevel, P)
-    ;   prove(G>[B], FV, I, J, K, LogicLevel, P)
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, ror(Gamma>Delta, P)) :-
+    Delta = [(A|B)], !,
+    (   prove(Gamma>[A], FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
+    ;   prove(Gamma>[B], FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P)
     ).
 % 11. R-and : Right conjunction
-prove(G>D, FV, I, J, K, LogicLevel, rand(G>D,P1,P2)) :-
-    D = [(A&B)], !,
-    prove(G>[A], FV, I, J, J1, LogicLevel, P1),
-    prove(G>[B], FV, I, J1, K, LogicLevel, P2).
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, rand(Gamma>Delta,P1,P2)) :-
+    Delta = [(A&B)], !,
+    prove(Gamma>[A], FreeVars, Threshold, SkolemIn, J1, LogicLevel, P1),
+    prove(Gamma>[B], FreeVars, Threshold, J1, SkolemOut, LogicLevel, P2).
  % 12. L-exists 
-prove(G > D, FV, I, J, K, LogicLevel, lex(G>D, P)) :-
-    select((?[_Z-X]:A), G, G1), !,
-    copy_term((X:A,FV), (f_sk(J,FV):A1,FV)),
-    J1 is J+1,
-    prove([A1|G1] > D, FV, I, J1, K, LogicLevel, P).
+prove(Gamma > Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, lex(Gamma>Delta, P)) :-
+    select((?[_Z-X]:A), Gamma, G1), !,
+    copy_term((X:A,FreeVars), (f_sk(SkolemIn,FreeVars):A1,FreeVars)),
+    J1 is SkolemIn+1,
+    prove([A1|G1] > Delta, FreeVars, Threshold, J1, SkolemOut, LogicLevel, P).
 % 15. R-exists 
-prove(G > D, FV, I, J, K, LogicLevel, rex(G>D, P)) :-
-    select((?[_Z-X]:A), D, D1), !,
-    length(FV, Len), Len < I,  
-    copy_term((X:A,FV), (Y:A1,FV)),
-    prove(G > [A1|D1], [Y|FV], I, J, K, LogicLevel, P), !.
+prove(Gamma > Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, rex(Gamma>Delta, P)) :-
+    select((?[_Z-X]:A), Delta, D1), !,
+    length(FreeVars, Len), Len < Threshold,  
+    copy_term((X:A,FreeVars), (Y:A1,FreeVars)),
+    prove(Gamma > [A1|D1], [Y|FreeVars], Threshold, SkolemIn, SkolemOut, LogicLevel, P), !.
 % 16. CQ_c - Classical rule
-prove(G>D, FV, I, J, K, classical, cq_c(G>D,P)) :-
-    select((![Z-X]:A) => B, G, G1),
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, classical, cq_c(Gamma>Delta,P)) :-
+    select((![Z-X]:A) => B, Gamma, G1),
     
     % Search for (exists?:?) => B in G1
     ( member((?[ZTarget-YTarget]:ATarget) => B, G1),
       % Compare (A => B) with ATarget
       \+ \+ ((A => B) = ATarget) ->
         % Unifiable: use YTarget
-        prove([?[ZTarget-YTarget]:ATarget|G1]>D, FV, I, J, K, classical, P)
+        prove([?[ZTarget-YTarget]:ATarget|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, classical, P)
     ;
         % Otherwise: normal case with X
-        prove([?[Z-X]:(A => B)|G1]>D, FV, I, J, K, classical, P)
+        prove([?[Z-X]:(A => B)|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, classical, P)
     ).
 % 17. CQ_m - Minimal rule (minimal and intuitionistic ONLY, last resort)
 % IMPORTANT: EXCLUDED from classical logic (IP + standard rules suffice)
-prove(G>D, FV, I, J, K, LogicLevel, cq_m(G>D,P)) :-
+prove(Gamma>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, cq_m(Gamma>Delta,P)) :-
     member(LogicLevel, [minimal, intuitionistic]),
-    select((?[Z-X]:A)=>B, G, G1),
-    prove([![Z-X]:(A=>B)|G1]>D, FV, I, J, K, LogicLevel, P).
+    select((?[Z-X]:A)=>B, Gamma, G1),
+    prove([![Z-X]:(A=>B)|G1]>Delta, FreeVars, Threshold, SkolemIn, SkolemOut, LogicLevel, P).
 % =========================================================================
 % EQUALITY RULES
 % =========================================================================
 % REFLEXIVITY: |- t = t
-prove(_G > D, _, _, J, J, _, eq_refl(D)) :-
-    D = [T = T],
-    ground(T),  % <- Ajouter cette ligne
+prove(_Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_refl(Delta)) :-
+    Delta = [T = T],
+    ground(T),
     !.
+
 % SYMMETRY: t = u |- u = t  
-prove(G > D, _, _, J, J, _, eq_sym(G>D)) :-
-    D = [A = B],
-    member(B = A, G),
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_sym(Gamma>Delta)) :-
+    Delta = [A = B],
+    member(B = A, Gamma),
     !.
+
 % SIMPLE TRANSITIVITY: t = u, u = v |- t = v
-prove(G > D, _, _, J, J, _, eq_trans(G>D)) :-
-    D = [A = C],
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_trans(Gamma>Delta)) :-
+    Delta = [A = C],
     A \== C,
-    (   (member(A = B, G), member(B = C, G))
-    ;   (member(B = A, G), member(B = C, G))
-    ;   (member(A = B, G), member(C = B, G))
-    ;   (member(B = A, G), member(C = B, G))
+    (   (member(A = B, Gamma), member(B = C, Gamma))
+    ;   (member(B = A, Gamma), member(B = C, Gamma))
+    ;   (member(A = B, Gamma), member(C = B, Gamma))
+    ;   (member(B = A, Gamma), member(C = B, Gamma))
     ),
     !.
+
 % CHAINED TRANSITIVITY: a=b, b=c, c=d |- a=d
-prove(G > D, _, _, J, J, _, eq_trans_chain(G>D)) :-
-    D = [A = C],
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_trans_chain(Gamma>Delta)) :-
+    Delta = [A = C],
     A \== C,
-    \+ member(A = C, G),
-    \+ member(C = A, G),
-    find_equality_path(A, C, G, [A], _Path),
+    \+ member(A = C, Gamma),
+    \+ member(C = A, Gamma),
+    find_equality_path(A, C, Gamma, [A], _Path),
     !.
+
 % CONGRUENCE: t = u |- f(t) = f(u)
-prove(G > D, _, _, J, J, _, eq_cong(G>D)) :-
-    D = [LHS = RHS],
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_cong(Gamma>Delta)) :-
+    Delta = [LHS = RHS],
     LHS =.. [F|ArgsL],
     RHS =.. [F|ArgsR],
     length(ArgsL, N),
     length(ArgsR, N),
     N > 0,
     find_diff_pos(ArgsL, ArgsR, _Pos, TermL, TermR),
-    (member(TermL = TermR, G) ; member(TermR = TermL, G)),
+    (member(TermL = TermR, Gamma) ; member(TermR = TermL, Gamma)),
     !.
+
 % SUBSTITUTION IN EQUALITY: x=y, f(x)=z |- f(y)=z
-prove(G > D, _, _, J, J, _, eq_subst_eq(G>D)) :-
-    D = [Goal_LHS = Goal_RHS],
-    member(Ctx_LHS = Ctx_RHS, G),
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_subst_eq(Gamma>Delta)) :-
+    Delta = [Goal_LHS = Goal_RHS],
+    member(Ctx_LHS = Ctx_RHS, Gamma),
     Ctx_LHS \== Goal_LHS,
-    member(X = Y, G),
+    member(X = Y, Gamma),
     X \== Y,
     (
         (substitute_in_term(X, Y, Ctx_LHS, Goal_LHS), Ctx_RHS == Goal_RHS)
@@ -1147,17 +1052,18 @@ prove(G > D, _, _, J, J, _, eq_subst_eq(G>D)) :-
     ;   (substitute_in_term(Y, X, Ctx_RHS, Goal_RHS), Ctx_LHS == Goal_LHS)
     ),
     !.
+
 % SUBSTITUTION (Leibniz): t = u, P(t) |- P(u)
-prove(G > D, _, _, J, J, _, eq_subst(G>D)) :-
-    D = [Goal],
+prove(Gamma > Delta, _, _, SkolemIn, SkolemIn, _, eq_subst(Gamma>Delta)) :-
+    Delta = [Goal],
     Goal \= (_ = _),
     Goal \= (_ => _),
     Goal \= (_ & _),
     Goal \= (_ | _),
     Goal \= (!_),
     Goal \= (?_),
-    member(A = B, G),
-    member(Pred, G),
+    member(A = B, Gamma),
+    member(Pred, Gamma),
     Pred \= (_ = _),
     Pred \= (_ => _),
     Pred \= (_ & _),
@@ -1167,6 +1073,7 @@ prove(G > D, _, _, J, J, _, eq_subst(G>D)) :-
     member_pos(A, Args, Pos),
     nth0(Pos, GoalArgs, B),
     !.
+
 % =========================================================================
 % HELPERS
 % =========================================================================
@@ -1205,16 +1112,17 @@ is_nested_negation(Target, Target, 0) :- !.
 is_nested_negation((Inner => #), Target, N) :-
     is_nested_negation(Inner, Target, N1),
     N is N1 + 1.
+
 % =========================================================================
 % END of Prover
 % =========================================================================
 % =========================================================================
-% G4 PRINTER SPECIALISE POUR BUSSPROOFS
-% Rendu LaTeX optimise pour les regles G4 authentiques
+% END of Prover
 % =========================================================================
-
-% Directive pour eviter les warnings
-:- discontiguous render_bussproofs/3.
+% =========================================================================
+% G4 PRINTER SPECIALIZED FOR BUSSPROOFS
+% Optimized LaTeX rendering for authentic G4 rules
+% =========================================================================
 
 % =========================================================================
 % G4 rules 
@@ -1224,132 +1132,132 @@ is_nested_negation((Inner => #), Target, N) :-
 render_bussproofs(ax(Seq, _), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $Ax.$}'), nl,
+    write('\\RightLabel{\\scriptsize{$Ax.$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% 2. L0-> 
-render_bussproofs(l0cond(Seq, P), VarCounter, FinalCounter) :-
+% 2. L0-implies
+render_bussproofs(l0cond(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ L0\\to$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L0\\to$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 3. L&-> 
-render_bussproofs(landto(Seq, P), VarCounter, FinalCounter) :-
+% 3. L-and-implies
+render_bussproofs(landto(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ L\\land\\to$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L\\land\\to$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-render_bussproofs(tne(Seq, P), VarCounter, FinalCounter) :-
+% TNE
+render_bussproofs(tne(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ R \\to$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$R\\to$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 4. L?-> : Disjonction vers implication
-render_bussproofs(lorto(Seq, P), VarCounter, FinalCounter) :-
+% 4. L-or-implies
+render_bussproofs(lorto(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ L\\lor\\to$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L\\lor\\to$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-
-% Lexists-v
-render_bussproofs(lex_lor(Seq, P1, P2), VarCounter, FinalCounter) :-
+% L-exists-or
+render_bussproofs(lex_lor(Seq, Proof1, Proof2), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P1, VarCounter, Temp1),
-    render_bussproofs(P2, Temp1, Temp2),
-    write('\\RightLabel{\\scriptsize $ L\\exists\\lor$}'), nl,
+    render_bussproofs(Proof1, VarCounter, Temp1),
+    render_bussproofs(Proof2, Temp1, Temp2),
+    write('\\RightLabel{\\scriptsize{$L\\exists\\lor$}}'), nl,
     write('\\BinaryInfC{$'),
     render_sequent(Seq, Temp2, FinalCounter),
     write('$}'), nl.
 
-% 5. L&
-render_bussproofs(land(Seq, P), VarCounter, FinalCounter) :-
+% 5. L-and
+render_bussproofs(land(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ L\\land$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L\\land$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 6. Lv 
-render_bussproofs(lor(Seq, P1, P2), VarCounter, FinalCounter) :-
+% 6. L-or
+render_bussproofs(lor(Seq, Proof1, Proof2), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P1, VarCounter, Temp1),
-    render_bussproofs(P2, Temp1, Temp2),
-    write('\\RightLabel{\\scriptsize $ L\\lor$}'), nl,
+    render_bussproofs(Proof1, VarCounter, Temp1),
+    render_bussproofs(Proof2, Temp1, Temp2),
+    write('\\RightLabel{\\scriptsize{$L\\lor$}}'), nl,
     write('\\BinaryInfC{$'),
     render_sequent(Seq, Temp2, FinalCounter),
     write('$}'), nl.
 
-% 7. R->
-render_bussproofs(rcond(Seq, P), VarCounter, FinalCounter) :-
+% 7. R-implies
+render_bussproofs(rcond(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ R\\to$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$R\\to$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 8. Rv 
-render_bussproofs(ror(Seq, P), VarCounter, FinalCounter) :-
+% 8. R-or
+render_bussproofs(ror(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ R\\lor$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$R\\lor$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 9. L->-> 
-render_bussproofs(ltoto(Seq, P1, P2), VarCounter, FinalCounter) :-
+% 9. L-implies-implies
+render_bussproofs(ltoto(Seq, Proof1, Proof2), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P1, VarCounter, Temp1),
-    render_bussproofs(P2, Temp1, Temp2),
-    write('\\RightLabel{\\scriptsize $ L\\to\\to$}'), nl,
+    render_bussproofs(Proof1, VarCounter, Temp1),
+    render_bussproofs(Proof2, Temp1, Temp2),
+    write('\\RightLabel{\\scriptsize{$L\\to\\to$}}'), nl,
     write('\\BinaryInfC{$'),
     render_sequent(Seq, Temp2, FinalCounter),
     write('$}'), nl.
 
-% 10. R& 
-render_bussproofs(rand(Seq, P1, P2), VarCounter, FinalCounter) :-
+% 10. R-and
+render_bussproofs(rand(Seq, Proof1, Proof2), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P1, VarCounter, Temp1),
-    render_bussproofs(P2, Temp1, Temp2),
-    write('\\RightLabel{\\scriptsize $ R\\land$}'), nl,
+    render_bussproofs(Proof1, VarCounter, Temp1),
+    render_bussproofs(Proof2, Temp1, Temp2),
+    write('\\RightLabel{\\scriptsize{$R\\land$}}'), nl,
     write('\\BinaryInfC{$'),
     render_sequent(Seq, Temp2, FinalCounter),
     write('$}'), nl.
 
-% 11. Lbot
+% 11. L-bot
 render_bussproofs(lbot(Seq, _), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ L\\bot$}'), nl,
+    write('\\RightLabel{\\scriptsize{$L\\bot$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% IP : Indirect proof (avec detection DNE_m)
-render_bussproofs(ip(Seq, P), VarCounter, FinalCounter) :-
+% IP : Indirect proof (with DNE_m detection)
+render_bussproofs(ip(Seq, Proof), VarCounter, FinalCounter) :-
     !,
     Seq = (_ > [Goal]),
-    render_bussproofs(P, VarCounter, TempCounter),
+    render_bussproofs(Proof, VarCounter, TempCounter),
     ( Goal = (_ => #) ->
-        write('\\RightLabel{\\scriptsize $ DNE_{m}$}'), nl
+        write('\\RightLabel{\\scriptsize{$DNE_{m}$}}'), nl
     ;
-        write('\\RightLabel{\\scriptsize $ IP$}'), nl
+        write('\\RightLabel{\\scriptsize{$IP$}}'), nl
     ),
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
@@ -1359,71 +1267,69 @@ render_bussproofs(ip(Seq, P), VarCounter, FinalCounter) :-
 %  FOL QUANTIFICATION RULES
 % =========================================================================
 
-% 12. Rforall 
-render_bussproofs(rall(Seq, P), VarCounter, FinalCounter) :-
+% 12. R-forall
+render_bussproofs(rall(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ R\\forall$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$R\\forall$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 13. Lexists 
-render_bussproofs(lex(Seq, P), VarCounter, FinalCounter) :-
+% 13. L-exists
+render_bussproofs(lex(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ L\\exists$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L\\exists$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 14. Rexists
-render_bussproofs(rex(Seq, P), VarCounter, FinalCounter) :-
+% 14. R-exists
+render_bussproofs(rex(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ R\\exists$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$R\\exists$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% 15. Lforall
-render_bussproofs(lall(Seq, P), VarCounter, FinalCounter) :-
+% 15. L-forall
+render_bussproofs(lall(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $L\\forall$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$L\\forall$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-
-% CQ_c : Regle de conversion classique (?x:A => B) => ?x:(A => B)
-render_bussproofs(cq_c(Seq, P), VarCounter, FinalCounter) :-
+% CQ_c : Classical conversion rule
+render_bussproofs(cq_c(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ CQ_{c}$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$CQ_{c}$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
 
-% CQ_m : Regle de conversion minimale (?x:A => B) => ?x:(A => B)
-render_bussproofs(cq_m(Seq, P), VarCounter, FinalCounter) :-
+% CQ_m : Minimal conversion rule
+render_bussproofs(cq_m(Seq, Proof), VarCounter, FinalCounter) :-
     !,
-    render_bussproofs(P, VarCounter, TempCounter),
-    write('\\RightLabel{\\scriptsize $ CQ_{m}$}'), nl,
+    render_bussproofs(Proof, VarCounter, TempCounter),
+    write('\\RightLabel{\\scriptsize{$CQ_{m}$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, TempCounter, FinalCounter),
     write('$}'), nl.
-
 
 % =========================================================================
-% REGLES D'EGALITE - VERSION CORRIGEE
+% EQUALITY RULES
 % =========================================================================
 
-% Reflexivite : Seq = [t = t] (pas de tuple)
+% Reflexivity : Seq = [t = t]
 render_bussproofs(eq_refl(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Refl$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = I $}}'), nl,
     write('\\UnaryInfC{$'),
     write(' \\vdash '),
     ( Seq = [Goal] -> 
@@ -1434,29 +1340,29 @@ render_bussproofs(eq_refl(Seq), VarCounter, FinalCounter) :-
     ),
     write('$}'), nl.
 
-% Symetrie
+% Symmetry
 render_bussproofs(eq_sym(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Sym$}'),  nl,
+    write('\\RightLabel{\\scriptsize{$ = E$}}'),  nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% Transitivite simple
+% Simple transitivity
 render_bussproofs(eq_trans(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Trans$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = E $}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% Transitivite chainee
+% Chained transitivity
 render_bussproofs(eq_trans_chain(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Trans^*$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = E$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
@@ -1465,16 +1371,16 @@ render_bussproofs(eq_trans_chain(Seq), VarCounter, FinalCounter) :-
 render_bussproofs(eq_cong(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Cong$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = E$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% Substitution dans egalite
+% Substitution in equality
 render_bussproofs(eq_subst_eq(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Subst_{eq}$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = E $}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
@@ -1483,44 +1389,46 @@ render_bussproofs(eq_subst_eq(Seq), VarCounter, FinalCounter) :-
 render_bussproofs(eq_subst(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ Leibniz$}'), nl,
+    write('\\RightLabel{\\scriptsize{$ = E$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
-% Substitution pour equivalence logique
+% Substitution for logical equivalence
 render_bussproofs(equiv_subst(Seq), VarCounter, FinalCounter) :-
     !,
     write('\\AxiomC{}'), nl,
-    write('\\RightLabel{\\scriptsize $ \\equiv$}'), nl,
+    write('\\RightLabel{\\scriptsize{$\\equiv$}}'), nl,
     write('\\UnaryInfC{$'),
     render_sequent(Seq, VarCounter, FinalCounter),
     write('$}'), nl.
 
+% =========================================================================
+% SEQUENT RENDERING
+% =========================================================================
 
-% Filter 
-render_sequent(G > D, VarCounter, FinalCounter) :-
-    % TOUJOURS utiliser G du sequent, PAS premise_list !
-    filter_top_from_gamma(G, FilteredG),
+% Filter and render sequent
+render_sequent(Gamma > Delta, VarCounter, FinalCounter) :-
+    % ALWAYS use Gamma from sequent, NOT premiss_list!
+    filter_top_from_gamma(Gamma, FilteredGamma),
     
-    ( FilteredG = [] ->
-        % Theoreme : pas de premisses a afficher
+    ( FilteredGamma = [] ->
+        % Theorem: no premisses to display
         write(' \\vdash '),
         TempCounter = VarCounter
     ;
-        % Sequent avec premisses
-        render_formula_list(FilteredG, VarCounter, TempCounter),
+        % Sequent with premisses
+        render_formula_list(FilteredGamma, VarCounter, TempCounter),
         write(' \\vdash ')
     ),
-    ( D = [] ->
+    ( Delta = [] ->
         write('\\bot'),
         FinalCounter = TempCounter
     ;
-        render_formula_list(D, TempCounter, FinalCounter)
+        render_formula_list(Delta, TempCounter, FinalCounter)
     ).
 
-
-% filter_top_from_gamma/2: Enleve ? (top) de la liste de premisses
+% filter_top_from_gamma/2: Remove top (⊤) from premisses list
 filter_top_from_gamma([], []).
 filter_top_from_gamma([H|T], Filtered) :-
     ( is_top_formula(H) ->
@@ -1530,26 +1438,26 @@ filter_top_from_gamma([H|T], Filtered) :-
         Filtered = [H|RestFiltered]
     ).
 
-% is_top_formula/1: Detecte si une formule est ? (top)
-% ? est represente comme (# => #) ou parfois ~ #
+% is_top_formula/1: Detect if a formula is top (⊤)
+% Top is represented as (# => #) or sometimes ~ #
 is_top_formula((# => #)) :- !.
-is_top_formula(((# => #) => #) => #) :- !.  % Double negation de ?
+is_top_formula(((# => #) => #) => #) :- !.  % Double negation of top
 is_top_formula(_) :- fail.
 
 % =========================================================================
-% RENDU DES LISTES DE FORMULES
+% FORMULA LIST RENDERING
 % =========================================================================
 
-% Liste vide
+% Empty list
 render_formula_list([], VarCounter, VarCounter) :- !.
 
-% Formule unique
+% Single formula
 render_formula_list([F], VarCounter, FinalCounter) :-
     !,
     rewrite(F, VarCounter, FinalCounter, F_latex),
     write_formula_with_parens(F_latex).
 
-% Liste de formules avec virgules
+% List of formulas with commas
 render_formula_list([F|Rest], VarCounter, FinalCounter) :-
     rewrite(F, VarCounter, TempCounter, F_latex),
     write(F_latex),
@@ -1557,48 +1465,51 @@ render_formula_list([F|Rest], VarCounter, FinalCounter) :-
     render_formula_list(Rest, TempCounter, FinalCounter).
 
 % =========================================================================
-% INTEGRATION AVEC LE SYSTEME PRINCIPAL
+% INTEGRATION WITH MAIN SYSTEM
 % =========================================================================
 
-% Interface compatible avec decide/1
+% Interface compatible with decide/1
 render_g4_bussproofs_from_decide(Proof) :-
     render_g4_proof(Proof).
 
-% Interface compatible avec prove_formula_clean/3
+% Interface compatible with prove_formula_clean/3
 render_g4_bussproofs_from_clean(Proof) :-
     render_g4_proof(Proof).
 
 % =========================================================================
-% COMMENTAIRES ET DOCUMENTATION
+% COMMENTS AND DOCUMENTATION
 % =========================================================================
 
-% Ce printer G4 est specialement optimise pour :
+% This G4 printer is specially optimized for:
 % 
-% 1. LES REGLES G4 AUTHENTIQUES :
-%    - L0-> (modus ponens signature de G4)
-%    - L?->, L?-> (transformations curryifiees)
-%    - L->-> (regle G4 speciale)
-%    - Ordre exact du multiprover.pl
+% 1. AUTHENTIC G4 RULES:
+%    - L0-> (modus ponens G4 signature)
+%    - L-and->, L-or-> (curried transformations)
+%    - L->-> (special G4 rule)
+%    - Exact order from multiprover.pl
 %
-% 2. COMPATIBILITE MULTIFORMATS :
-%    - Utilise le systeme rewrite/4 de latex_utilities.pl
-%    - Compatible avec les quantificateurs FOL
-%    - Gere les antisequents pour les echecs
+% 2. MULTI-FORMAT COMPATIBILITY:
+%    - Uses rewrite/4 system from latex_utilities.pl
+%    - Compatible with FOL quantifiers
+%    - Handles anti-sequents for failures
 %
-% 3. RENDU LATEX PROFESSIONNEL :
-%    - bussproofs.sty standard
-%    - Labels compacts et clairs
-%    - Gestion automatique des compteurs de variables
+% 3. PROFESSIONAL LATEX RENDERING:
+%    - Standard bussproofs.sty
+%    - Compact and clear labels
+%    - Automatic variable counter management
 %
-% USAGE :
-% ?- decide(Formula).  % Utilise automatiquement ce printer
-% ?- render_g4_proof(Proof).  % Rendu direct d'une preuve
+% USAGE:
+% ?- decide(Formula).  % Automatically uses this printer
+% ?- render_g4_proof(Proof).  % Direct proof rendering
 
 % =========================================================================
-% FIN DU G4 PRINTER
+% END OF G4 PRINTER
 % =========================================================================
+%========================================================================  
+% COMMON ND PRINTING
+%========================================================================
 % =========================================================================
-% GESTION DES TERMES CYCLIQUES
+% CYCLIC TERMS HANDLING
 % =========================================================================
 make_acyclic_term(Term, Safe) :-
     catch(
@@ -1639,22 +1550,31 @@ replace_pair(Term, OldVal, NewVal, [H|T], [H|T2]) :-
     replace_pair(Term, OldVal, NewVal, T, T2).
 replace_pair(_, _, _, [], []).
 
+% =========================================================================
+% HELPER COMBINATORS
+% =========================================================================
+
+% Helper: Remove ALL annotations (not just quantifiers)
+strip_annotations_deep(@(Term, _), Stripped) :- 
+    !, strip_annotations_deep(Term, Stripped).
+strip_annotations_deep(![_-X]:Body, ![X]:StrippedBody) :- 
+    !, strip_annotations_deep(Body, StrippedBody).
+strip_annotations_deep(?[_-X]:Body, ?[X]:StrippedBody) :- 
+    !, strip_annotations_deep(Body, StrippedBody).
+strip_annotations_deep(A & B, SA & SB) :- 
+    !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
+strip_annotations_deep(A | B, SA | SB) :- 
+    !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
+strip_annotations_deep(A => B, SA => SB) :- 
+    !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
+strip_annotations_deep(A <=> B, SA <=> SB) :- 
+    !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
+strip_annotations_deep(Term, Term).
 
 % =========================================================================
-% HELPERS COMBINATORS
+% FITCH DERIVATION HELPERS
 % =========================================================================
-% Helper : Enlever TOUTES les annotations (pas juste les quantificateurs)
-strip_annotations_deep(@(Term, _), Stripped) :- !, strip_annotations_deep(Term, Stripped).
-strip_annotations_deep(![_-X]:Body, ![X]:StrippedBody) :- !, strip_annotations_deep(Body, StrippedBody).
-strip_annotations_deep(?[_-X]:Body, ?[X]:StrippedBody) :- !, strip_annotations_deep(Body, StrippedBody).
-strip_annotations_deep(A & B, SA & SB) :- !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
-strip_annotations_deep(A | B, SA | SB) :- !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
-strip_annotations_deep(A => B, SA => SB) :- !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
-strip_annotations_deep(A <=> B, SA <=> SB) :- !, strip_annotations_deep(A, SA), strip_annotations_deep(B, SB).
-strip_annotations_deep(Term, Term).
-% =========================================================================
-% HELPERS COMBINATORS
-% =========================================================================
+
 derive_and_continue(Scope, Formula, RuleTemplate, Refs, RuleTerm, SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     derive_formula(Scope, Formula, RuleTemplate, Refs, RuleTerm, CurLine, DerivLine, _, VarIn, V1),
     fitch_g4_proof(SubProof, [DerivLine:Formula|Context], Scope, DerivLine, NextLine, ResLine, V1, VarOut).
@@ -1672,9 +1592,11 @@ assume_in_scope(Assumption, _Goal, SubProof, Context, ParentScope, StartLine, En
     render_hypo(ParentScope, Assumption, 'AS', StartLine, AssLine, VarIn, V1),
     NewScope is ParentScope + 1,
     fitch_g4_proof(SubProof, [AssLine:Assumption|Context], NewScope, AssLine, EndLine, GoalLine, V1, VarOut).
+
 % =========================================================================
-% EXTRACTION & HELPERS
+% FORMULA EXTRACTION & HELPERS
 % =========================================================================
+
 extract_new_formula(CurrentPremisses, SubProof, NewFormula) :-
     SubProof =.. [_Rule|[(SubPremisses > _SubGoal)|_]],
     member(NewFormula, SubPremisses),
@@ -1692,46 +1614,46 @@ extract_new_formula(CurrentPremisses, SubProof, _) :-
     format('%   SubProof rule: ~w~n', [Rule]),
     format('%   SubPremisses: ~w~n', [SubPremisses]),
     fail.
+
 % =========================================================================
-% FIND_CONTEXT_LINE : Matcher formules dans le contexte
+% FIND_CONTEXT_LINE: Match formulas in context
 % =========================================================================
-% =========================================================================
-% PRIORITE ABSOLUE : PREMISSES (lignes 1-N ou N = nombre de premisses)
+% ABSOLUTE PRIORITY: PREMISSES (lines 1-N where N = number of premisses)
 % =========================================================================
 
 find_context_line(Formula, Context, LineNumber) :-
-    premise_list(PremList),
-    length(PremList, NumPremises),
-    % Chercher UNIQUEMENT dans les N premieres lignes
+    premiss_list(PremList),
+    length(PremList, NumPremisses),
+    % Search ONLY in the first N lines
     member(LineNumber:ContextFormula, Context),
-    LineNumber =< NumPremises,
-    % Matcher avec les differentes variantes possibles
+    LineNumber =< NumPremisses,
+    % Match with different possible variants
     ( ContextFormula = Formula
     ; strip_annotations_match(Formula, ContextFormula)
     ; formulas_equivalent(Formula, ContextFormula)
     ),
-    !.  % Couper des qu'on trouve dans les premisses
+    !.  % Cut as soon as found in premisses
 
 % =========================================================================
-% PRIORITE -1 : NEGATION DE QUANTIFICATEUR (forme originale ~)
+% PRIORITY -1: QUANTIFIER NEGATION (original ~ form)
 % =========================================================================
 
-% Cherche (![x-x]:Body) => # mais contexte a ~![x]:Body (forme originale)
+% Search for (![x-x]:Body) => # but context has ~![x]:Body (original form)
 find_context_line((![_Z-_X]:Body) => #, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
-        % Forme originale avec ~
+        % Original form with ~
         ContextFormula = (~ ![_]:Body)
     ;
-        % Forme transformee
+        % Transformed form
         ContextFormula = ((![_]:Body) => #)
     ;
-        % Forme transformee avec annotation
+        % Transformed form with annotation
         ContextFormula = ((![_-_]:Body) => #)
     ),
     !.
 
-% Meme chose pour l'existentiel
+% Same for existential
 find_context_line((?[_Z-_X]:Body) => #, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
@@ -1742,24 +1664,26 @@ find_context_line((?[_Z-_X]:Body) => #, Context, LineNumber) :-
         ContextFormula = ((?[_-_]:Body) => #)
     ),
     !.
+
 % =========================================================================
-% PRIORITE 0 : QUANTIFICATEURS - MATCHER STRUCTURE INTERNE COMPLEXE
+% PRIORITY 0: QUANTIFIERS - MATCH COMPLEX INTERNAL STRUCTURE
 % =========================================================================
-% Universel : matcher structure interne independamment de la transformation
+
+% Universal: match internal structure independently of transformation
 find_context_line(![Z-_]:SearchBody, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
-        % Cas 1: Contexte sans annotation
+        % Case 1: Context without annotation
         ContextFormula = (![Z]:ContextBody),
         formulas_equivalent(SearchBody, ContextBody)
     ;
-        % Cas 2: Contexte avec annotation
+        % Case 2: Context with annotation
         ContextFormula = (![Z-_]:ContextBody),
         formulas_equivalent(SearchBody, ContextBody)
     ),
     !.
 
-% Existentiel : matcher structure interne
+% Existential: match internal structure
 find_context_line(?[Z-_]:SearchBody, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
@@ -1772,49 +1696,49 @@ find_context_line(?[Z-_]:SearchBody, Context, LineNumber) :-
     !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 1 : NEGATIONS (notation originale ~ vs transformee => #)
+% PRIORITY 1: NEGATIONS (original ~ notation vs transformed => #)
 % -------------------------------------------------------------------------
 
-% Cas 1: Cherche ?[x]:A => # mais contexte a ~ ?[x]:A
+% Case 1: Search for ?[x]:A => # but context has ~ ?[x]:A
 find_context_line((?[Z-_]:A) => #, Context, LineNumber) :-
     member(LineNumber:(~ ?[Z]:A), Context), !.
 
-% Cas 2: Cherche ![x]:(A => #) mais contexte a ![x]: ~A
+% Case 2: Search for ![x]:(A => #) but context has ![x]: ~A
 find_context_line(![Z-_]:(A => #), Context, LineNumber) :-
     member(LineNumber:(![Z]: ~A), Context), !.
 
-% Cas 3: Cherche A => # mais contexte a ~A (formule simple)
+% Case 3: Search for A => # but context has ~A (simple formula)
 find_context_line(A => #, Context, LineNumber) :-
     A \= (?[_]:_),
     A \= (![_]:_),
     member(LineNumber:(~A), Context), !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 2 : QUANTIFICATEURS (avec/sans annotations de variables)
+% PRIORITY 2: QUANTIFIERS (with/without variable annotations)
 % -------------------------------------------------------------------------
 
-% Universel : cherche ![x-x]:Body mais contexte a ![x]:Body
+% Universal: search for ![x-x]:Body but context has ![x]:Body
 find_context_line(![Z-_]:Body, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
-        ContextFormula = (![Z]:Body)      % Sans annotation
+        ContextFormula = (![Z]:Body)      % Without annotation
     ;
-        ContextFormula = (![Z-_]:Body)    % Avec annotation differente
+        ContextFormula = (![Z-_]:Body)    % With different annotation
     ),
     !.
 
-% Existentiel : cherche ?[x-x]:Body mais contexte a ?[x]:Body
+% Existential: search for ?[x-x]:Body but context has ?[x]:Body
 find_context_line(?[Z-_]:Body, Context, LineNumber) :-
     member(LineNumber:ContextFormula, Context),
     (
-        ContextFormula = (?[Z]:Body)      % Sans annotation
+        ContextFormula = (?[Z]:Body)      % Without annotation
     ;
-        ContextFormula = (?[Z-_]:Body)    % Avec annotation differente
+        ContextFormula = (?[Z-_]:Body)    % With different annotation
     ),
     !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 3 : BICONDITIONNELLES (decomposees)
+% PRIORITY 3: BICONDITIONALS (decomposed)
 % -------------------------------------------------------------------------
 
 find_context_line((A => B) & (B => A), Context, LineNumber) :-
@@ -1824,14 +1748,14 @@ find_context_line((B => A) & (A => B), Context, LineNumber) :-
     member(LineNumber:(A <=> B), Context), !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 4 : MATCH EXACT
+% PRIORITY 4: EXACT MATCH
 % -------------------------------------------------------------------------
 
 find_context_line(Formula, Context, LineNumber) :-
     member(LineNumber:Formula, Context), !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 5 : UNIFICATION
+% PRIORITY 5: UNIFICATION
 % -------------------------------------------------------------------------
 
 find_context_line(Formula, Context, LineNumber) :-
@@ -1839,7 +1763,7 @@ find_context_line(Formula, Context, LineNumber) :-
     unify_with_occurs_check(Formula, ContextFormula), !.
 
 % -------------------------------------------------------------------------
-% PRIORITE 6 : STRUCTURE MATCHING
+% PRIORITY 6: STRUCTURE MATCHING
 % -------------------------------------------------------------------------
 
 find_context_line(Formula, Context, LineNumber) :-
@@ -1847,25 +1771,24 @@ find_context_line(Formula, Context, LineNumber) :-
     match_formula_structure(Formula, ContextFormula), !.
 
 % -------------------------------------------------------------------------
-% FALLBACK : WARNING si aucune correspondance
+% FALLBACK: WARNING if no match found
 % -------------------------------------------------------------------------
 
 find_context_line(Formula, _Context, 0) :-
     format('% WARNING: Formula ~w not found in context~n', [Formula]).
 
 % =========================================================================
-% HELPER : Equivalence de formules (comparaison structurelle pure)
+% HELPER: Formula equivalence (pure structural comparison)
 % =========================================================================
 
-% Helper : matcher en enlevant les annotations
+% Helper: match by removing annotations
 strip_annotations_match(![_-X]:Body, ![X]:Body) :- !.
 strip_annotations_match(![X]:Body, ![_-X]:Body) :- !.
 strip_annotations_match(?[_-X]:Body, ?[X]:Body) :- !.
 strip_annotations_match(?[X]:Body, ?[_-X]:Body) :- !.
 strip_annotations_match(A, B) :- A = B.
 
-
-% Biconditionnelle : matcher structure sans regarder l'ordre
+% Biconditional: match structure without considering order
 formulas_equivalent((A1 => B1) & (B2 => A2), C <=> D) :- 
     !,
     (
@@ -1894,11 +1817,11 @@ formulas_equivalent((A <=> B), (C <=> D)) :-
         (formulas_equivalent(A, D), formulas_equivalent(B, C))
     ).
 
-% Negation transformee
+% Transformed negation
 formulas_equivalent(A => #, ~ B) :- !, formulas_equivalent(A, B).
 formulas_equivalent(~ A, B => #) :- !, formulas_equivalent(A, B).
 
-% Quantificateurs : comparer corps uniquement (ignorer variable)
+% Quantifiers: compare bodies only (ignore variable)
 formulas_equivalent(![_]:Body1, ![_]:Body2) :- 
     !, formulas_equivalent(Body1, Body2).
 formulas_equivalent(![_-_]:Body1, ![_]:Body2) :- 
@@ -1917,7 +1840,7 @@ formulas_equivalent(?[_]:Body1, ?[_-_]:Body2) :-
 formulas_equivalent(?[_-_]:Body1, ?[_-_]:Body2) :- 
     !, formulas_equivalent(Body1, Body2).
 
-% Connecteurs binaires
+% Binary connectives
 formulas_equivalent(A & B, C & D) :- 
     !, formulas_equivalent(A, C), formulas_equivalent(B, D).
 formulas_equivalent(A | B, C | D) :- 
@@ -1925,28 +1848,29 @@ formulas_equivalent(A | B, C | D) :-
 formulas_equivalent(A => B, C => D) :- 
     !, formulas_equivalent(A, C), formulas_equivalent(B, D).
 
-% Faux
+% Bottom
 formulas_equivalent(#, #) :- !.
 
-% Predicats/Termes : comparer structure (ignorer variables)
+% Predicates/Terms: compare structure (ignore variables)
 formulas_equivalent(Term1, Term2) :-
     compound(Term1),
     compound(Term2),
     !,
     Term1 =.. [Functor|_Args1],
     Term2 =.. [Functor|_Args2],
-    % Meme foncteur suffit (on ignore les arguments qui sont des variables)
+    % Same functor is sufficient (we ignore arguments that are variables)
     !.
 
-% Identite stricte
+% Strict identity
 formulas_equivalent(A, B) :- A == B, !.
 
-% Fallback : termes atomiques avec meme nom
+% Fallback: atomic terms with same name
 formulas_equivalent(A, B) :- 
     atomic(A), atomic(B),
     !.
 
-% Helper : matcher deux formules par structure (module renommage de variables)
+% Helper: match two formulas by structure (modulo variable renaming)
+
 % Negations
 match_formula_structure(A => #, B => #) :- 
     !, match_formula_structure(A, B).
@@ -1957,13 +1881,13 @@ match_formula_structure(A => #, ~ B) :-
 match_formula_structure(~ A, ~ B) :- 
     !, match_formula_structure(A, B).
 
-% Quantificateurs
+% Quantifiers
 match_formula_structure(![_-_]:Body1, ![_-_]:Body2) :-
     !, match_formula_structure(Body1, Body2).
 match_formula_structure(?[_-_]:Body1, ?[_-_]:Body2) :-
     !, match_formula_structure(Body1, Body2).
 
-% Connecteurs binaires
+% Binary connectives
 match_formula_structure(A & B, C & D) :-
     !, match_formula_structure(A, C), match_formula_structure(B, D).
 match_formula_structure(A | B, C | D) :-
@@ -1973,17 +1897,20 @@ match_formula_structure(A => B, C => D) :-
 match_formula_structure(A <=> B, C <=> D) :-
     !, match_formula_structure(A, C), match_formula_structure(B, D).
 
-% Faux
+% Bottom
 match_formula_structure(#, #) :- !.
 
-% Egalite stricte
+% Strict equality
 match_formula_structure(A, B) :-
     A == B, !.
 
-% Subsomption
+% Subsumption
 match_formula_structure(A, B) :-
     subsumes_term(A, B) ; subsumes_term(B, A).
 
+% =========================================================================
+% ADDITIONAL FITCH HELPERS
+% =========================================================================
 
 find_disj_context(L, R, Context, Line) :-
     ( member(Line:(CL | CR), Context), subsumes_term((L | R), (CL | CR)) -> true
@@ -1993,7 +1920,9 @@ find_disj_context(L, R, Context, Line) :-
 extract_witness(SubProof, Witness) :-
     SubProof =.. [Rule|Args],
     Args = [(Prem > _)|_],
-    ( member(Witness, Prem), contains_skolem(Witness), ( Rule = rall ; Rule = lall ; \+ is_quantified(Witness) ) ), !.
+    ( member(Witness, Prem), contains_skolem(Witness), 
+      ( Rule = rall ; Rule = lall ; \+ is_quantified(Witness) ) 
+    ), !.
 extract_witness(SubProof, Witness) :-
     SubProof =.. [_, (_ > _), SubSP|_],
     extract_witness(SubSP, Witness).
@@ -2018,9 +1947,11 @@ extract_conjuncts((A & B), CLine, Scope, CurLine, [L1:A, L2:B], L2, VarIn, VarOu
     format(atom(Just2), '$ \\land E $ ~w', [CLine]),
     render_have(Scope, A, Just1, CurLine, L1, VarIn, V1),
     render_have(Scope, B, Just2, L1, L2, V1, VarOut).
+
 % =========================================================================
-% LOGIQUE DE DERIVATION IMMEDIATE
+% IMMEDIATE DERIVATION LOGIC
 % =========================================================================
+
 derive_immediate(Scope, Formula, RuleTerm, JustFormat, JustArgs, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, Formula, RuleTerm, Scope),
@@ -2081,7 +2012,7 @@ try_derive_immediately(Goal, Context, Scope, CurLine, NextLine, ResLine, VarIn, 
     derive_immediate(Scope, Goal, RuleTerm, JustFormat, JustArgs, CurLine, NextLine, ResLine, VarIn, VarOut).
 
 % =========================================================================
-% CONSTRUCTION DE LA MAP DES HYPOTHESES PARTAGEES
+% SHARED HYPOTHESIS MAP CONSTRUCTION
 % =========================================================================
 
 build_hypothesis_map([], Map, Map).
@@ -2104,73 +2035,79 @@ build_hypothesis_map([_|Rest], AccMap, FinalMap) :-
 % =========================================================================
 :- dynamic fitch_line/4.
 :- dynamic abbreviated_line/1.
+
 % =========================================================================
 % FROM G4 Sequent Calculus To Natural Deduction in Fitch Style 
 % =========================================================================
+
 g4_to_fitch_sequent(Proof, OriginalSequent) :-
     !,
     retractall(fitch_line(_, _, _, _)),
     retractall(abbreviated_line(_)),
     
-    OriginalSequent = (_G > [Conclusion]),
+    OriginalSequent = (_Gamma > [Conclusion]),
     
-    ( premise_list(PremList), PremList \= [] ->
-        render_premise_list(PremList, 0, 1, NextLine, InitialContext),
-        LastPremLine is NextLine - 1  % ? CORRECTION : derniere ligne de premisse
+    ( premiss_list(PremList), PremList \= [] ->
+        render_premiss_list(PremList, 0, 1, NextLine, InitialContext),
+        LastPremLine is NextLine - 1  % CORRECTION: last premiss line
     ;
         _NextLine = 1,
-        LastPremLine = 0,             % ? CORRECTION : pas de premisses
+        LastPremLine = 0,             % CORRECTION: no premisses
         InitialContext = []
     ),
     
-    % ? CORRECTION : Scope=1 (indentation), CurLine=LastPremLine (numerotation)
+    % CORRECTION: Scope=1 (indentation), CurLine=LastPremLine (numbering)
     fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, LastLine, ResLine, 0, _),
     
-    % DETECTER : Est-ce qu'une regle a ete appliquee ?
+    % DETECT: Has any rule been applied?
     ( LastLine = LastPremLine ->
-        % Aucune ligne ajoutee -> axiome pur -> afficher reiteration
+        % No line added -> pure axiom -> display reiteration
         write('\\fa '),
         rewrite(Conclusion, 0, _, LatexConclusion),
         write(LatexConclusion),
         format(' &  R ~w\\\\', [ResLine]), nl
     ;
-        % Une regle a deja affiche la conclusion -> ne rien faire
+        % A rule has already displayed the conclusion -> do nothing
         true
     ).
 
-% g4_to_fitch_theorem/1 : Pour theoremes (comportement original)
+% g4_to_fitch_theorem/1: For theorems (original behavior)
 g4_to_fitch_theorem(Proof) :-
     retractall(fitch_line(_, _, _, _)),
     retractall(abbreviated_line(_)),
     fitch_g4_proof(Proof, [], 1, 0, _, _, 0, _).
-% =========================================================================
-% AFFICHAGE DES PREMISSES
-% =========================================================================
-% render_premise_list/5: Affiche une liste de premisses en Fitch
-render_premise_list([], _, Line, Line, []) :- !.
 
-render_premise_list([LastPremiss], Scope, CurLine, NextLine, [CurLine:LastPremiss]) :-
+% =========================================================================
+% PREMISS DISPLAY
+% =========================================================================
+
+% render_premiss_list/5: Display a list of premisses in Fitch style
+render_premiss_list([], _, Line, Line, []) :- !.
+
+render_premiss_list([LastPremiss], Scope, CurLine, NextLine, [CurLine:LastPremiss]) :-
     !,
     render_fitch_indent(Scope),
     write(' \\fj '),
     rewrite(LastPremiss, 0, _, LatexFormula),
     write(LatexFormula),
     write(' &  PR\\\\'), nl,
-    assert_safe_fitch_line(CurLine, LastPremiss, premise, Scope),
+    assert_safe_fitch_line(CurLine, LastPremiss, premiss, Scope),
     NextLine is CurLine + 1.
     
-render_premise_list([Premiss|Rest], Scope, CurLine, NextLine, [CurLine:Premiss|RestContext]) :-
+render_premiss_list([Premiss|Rest], Scope, CurLine, NextLine, [CurLine:Premiss|RestContext]) :-
     render_fitch_indent(Scope),
     write(' \\fa '),
     rewrite(Premiss, 0, _, LatexFormula),
     write(LatexFormula),
     write(' &  PR\\\\'), nl,
-    assert_safe_fitch_line(CurLine, Premiss, premise, Scope),
+    assert_safe_fitch_line(CurLine, Premiss, premiss, Scope),
     NextCurLine is CurLine + 1,
-    render_premise_list(Rest, Scope, NextCurLine, NextLine, RestContext).
+    render_premiss_list(Rest, Scope, NextCurLine, NextLine, RestContext).
+
 % =========================================================================
-% ASSERTION SECURISEE
+% SAFE ASSERTION
 % =========================================================================
+
 assert_safe_fitch_line(N, Formula, Just, Scope) :-
     catch(
         (
@@ -2187,51 +2124,9 @@ assert_safe_fitch_line(N, Formula, Just, Scope) :-
             assertz(fitch_line(N, error_term(Formula), Just, Scope))
         )
     ).
+
 % =========================================================================
-% GESTION DES TERMES CYCLIQUES
-% =========================================================================
-/*
-make_acyclic_term(Term, Safe) :-
-    catch(
-        make_acyclic_term(Term, [], _MapOut, Safe),
-        _,
-        Safe = cyc(Term)
-    ).
-
-make_acyclic_term(Term, MapIn, MapOut, Safe) :-
-    ( var(Term) ->
-        Safe = Term, MapOut = MapIn
-    ; atomic(Term) ->
-        Safe = Term, MapOut = MapIn
-    ; find_pair(Term, MapIn, Value) ->
-        Safe = Value, MapOut = MapIn
-    ;
-        gensym(cyc, Patom),
-        Placeholder = cyc(Patom),
-        MapMid = [pair(Term, Placeholder)|MapIn],
-        Term =.. [F|Args],
-        make_acyclic_args(Args, MapMid, MapAfterArgs, SafeArgs),
-        SafeTermBuilt =.. [F|SafeArgs],
-        replace_pair(Term, Placeholder, SafeTermBuilt, MapAfterArgs, MapOut),
-        Safe = SafeTermBuilt
-    ).
-
-make_acyclic_args([], Map, Map, []).
-make_acyclic_args([A|As], MapIn, MapOut, [SA|SAs]) :-
-    make_acyclic_term(A, MapIn, MapMid, SA),
-    make_acyclic_args(As, MapMid, MapOut, SAs).
-
-find_pair(Term, [pair(Orig,Val)|_], Val) :- Orig == Term, !.
-find_pair(Term, [_|Rest], Val) :- find_pair(Term, Rest, Val).
-
-replace_pair(Term, OldVal, NewVal, [pair(Orig,OldVal)|Rest], [pair(Orig,NewVal)|Rest]) :- 
-    Orig == Term, !.
-replace_pair(Term, OldVal, NewVal, [H|T], [H|T2]) :- 
-    replace_pair(Term, OldVal, NewVal, T, T2).
-replace_pair(_, _, _, [], []).
-*/
-% =========================================================================
-% GESTION DES SUBSTITUTIONS @
+% @ SUBSTITUTION HANDLING
 % =========================================================================
 
 fitch_g4_proof(@(ProofTerm, _), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
@@ -2239,7 +2134,7 @@ fitch_g4_proof(@(ProofTerm, _), Context, Scope, CurLine, NextLine, ResLine, VarI
     fitch_g4_proof(ProofTerm, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut).
 
 % =========================================================================
-% AXIOME
+% AXIOM
 % =========================================================================
 
 fitch_g4_proof(ax((Premisses > [Goal]), _Tag), Context, _Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
@@ -2261,10 +2156,11 @@ fitch_g4_proof(ax((Premisses > [Goal])), Context, _Scope, CurLine, NextLine, Res
 % =========================================================================
 % PROPOSITIONAL RULES 
 % =========================================================================
-% L0-> 
-fitch_g4_proof(l0cond((Premisss > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+
+% L0-implies
+fitch_g4_proof(l0cond((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
-    select((Ant => Cons), Premisss, Remaining),
+    select((Ant => Cons), Premisses, Remaining),
     member(Ant, Remaining),
     find_context_line((Ant => Cons), Context, MajLine),
     find_context_line(Ant, Context, MinLine),
@@ -2274,7 +2170,7 @@ fitch_g4_proof(l0cond((Premisss > _), SubProof), Context, Scope, CurLine, NextLi
     assert_safe_fitch_line(DerLine, Cons, l0cond(MajLine, MinLine), Scope),
     fitch_g4_proof(SubProof, [DerLine:Cons|Context], Scope, DerLine, NextLine, ResLine, V1, VarOut).
 
-% L?-> 
+% L-and-implies
 fitch_g4_proof(landto((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     extract_new_formula(Premisses, SubProof, NewFormula),
     select(((A & B) => C), Premisses, _),
@@ -2282,7 +2178,7 @@ fitch_g4_proof(landto((Premisses > _), SubProof), Context, Scope, CurLine, NextL
     derive_and_continue(Scope, NewFormula, 'L$ \\land \\to $ ~w', [ImpLine],
                        landto(ImpLine), SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
-% L?-> : Disjunction to implications
+% L-or-implies: Disjunction to implications
 fitch_g4_proof(lorto((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     SubProof =.. [_Rule|[(SubPremisses > _SubGoal)|_]],
     findall(F, (member(F, SubPremisses), \+ member(F, Premisses)), NewFormulas),
@@ -2304,10 +2200,9 @@ fitch_g4_proof(lorto((Premisses > _), SubProof), Context, Scope, CurLine, NextLi
         fitch_g4_proof(SubProof, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut)
     ).
 
-% L? : Conjunction elimination
+% L-and: Conjunction elimination
 fitch_g4_proof(land((Premisses > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     select((A & B), Premisses, _),
-   % member(ConjLine:(A & B), Context), ligne corrigee par la suivante
     find_context_line((A & B), Context, ConjLine),
     ( is_direct_conjunct(Goal, (A & B)) ->
         derive_formula(Scope, Goal, '$ \\land E $ ~w', [ConjLine], land(ConjLine),
@@ -2318,10 +2213,10 @@ fitch_g4_proof(land((Premisses > [Goal]), SubProof), Context, Scope, CurLine, Ne
         fitch_g4_proof(SubProof, NewCtx, Scope, LastLine, NextLine, ResLine, V1, VarOut)
     ).
 
-% L? : Explosion
-fitch_g4_proof(lbot((Premisss > [Goal]), _), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+% L-bot: Explosion
+fitch_g4_proof(lbot((Premisses > [Goal]), _), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
-    member(#, Premisss),
+    member(#, Premisses),
     member(FalseLine: #, Context),
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, Goal, lbot(FalseLine), Scope),
@@ -2330,7 +2225,7 @@ fitch_g4_proof(lbot((Premisss > [Goal]), _), Context, Scope, CurLine, NextLine, 
     NextLine = DerLine,
     ResLine = DerLine.
 
-% R? : Disjunction introduction
+% R-or: Disjunction introduction
 fitch_g4_proof(ror((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     ( Goal = (_ | _), try_derive_immediately(Goal, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) ->
@@ -2345,10 +2240,10 @@ fitch_g4_proof(ror((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, R
     ).
 
 % =========================================================================
-% REGLES AVEC HYPOTHESES (ASSUME-DISCHARGE)
+% RULES WITH HYPOTHESES (ASSUME-DISCHARGE)
 % =========================================================================
 
-% R-> : Implication introduction
+% R-implies: Implication introduction
 fitch_g4_proof(rcond((_ > [A => B]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     HypLine is CurLine + 1,
@@ -2363,7 +2258,7 @@ fitch_g4_proof(rcond((_ > [A => B]), SubProof), Context, Scope, CurLine, NextLin
     NextLine = ImplLine,
     ResLine = ImplLine.
 
-% TNE : Triple negation elimination
+% TNE: Triple negation elimination
 fitch_g4_proof(tne((_ > [(A => B)]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     HypLine is CurLine + 1,
@@ -2378,7 +2273,7 @@ fitch_g4_proof(tne((_ > [(A => B)]), SubProof), Context, Scope, CurLine, NextLin
     NextLine = ImplLine,
     ResLine = ImplLine.
 
-% IP : Indirect proof / Classical
+% IP: Indirect proof / Classical
 fitch_g4_proof(ip((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     ( Goal = (A => #) ->
@@ -2400,18 +2295,18 @@ fitch_g4_proof(ip((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, Re
     NextLine = IPLine,
     ResLine = IPLine.
 
-% L? : Disjunction elimination
-fitch_g4_proof(lor((Premisss > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+% L-or: Disjunction elimination
+fitch_g4_proof(lor((Premisses > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     ( try_derive_immediately(Goal, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) ->
        true
     ; 
-      select((A | B), Premisss, _),
-      % First try to find the disjunction in the context, otherwise in premises
+      select((A | B), Premisses, _),
+      % First try to find the disjunction in the context, otherwise in premisses
       ( find_disj_context(A, B, Context, DisjLine) ->
           true
       ;
-          % Disjunction is a premise, find its line
+          % Disjunction is a premiss, find its line
           find_context_line((A | B), Context, DisjLine)
       ),
       AssLineA is CurLine + 1,
@@ -2432,10 +2327,10 @@ fitch_g4_proof(lor((Premisss > [Goal]), SP1, SP2), Context, Scope, CurLine, Next
     ).
 
 % =========================================================================
-% REGLES BINAIRES
+% BINARY RULES
 % =========================================================================
 
-% R? : Conjunction introduction
+% R-and: Conjunction introduction
 fitch_g4_proof(rand((_ > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     Goal = (L & _R),
     ( try_derive_immediately(Goal, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) -> true
@@ -2445,71 +2340,74 @@ fitch_g4_proof(rand((_ > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, 
                     End2, NextLine, ResLine, V2, VarOut)
     ).
 
-% L->-> : Special G4 rule
+% L-implies-implies: Special G4 rule
 fitch_g4_proof(ltoto((Premisses > _), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     select(((Ant => Inter) => Cons), Premisses, _),
     find_context_line(((Ant => Inter) => Cons), Context, ComplexLine),
     
-    % ETAPE 1 : Deriver (Inter => Cons) par L->->
+    % STEP 1: Derive (Inter => Cons) by L->->
     ExtractLine is CurLine + 1,
     format(atom(ExtractJust), 'L$ \\to \\to $ ~w', [ComplexLine]),
     render_have(Scope, (Inter => Cons), ExtractJust, CurLine, ExtractLine, VarIn, V1),
     assert_safe_fitch_line(ExtractLine, (Inter => Cons), ltoto(ComplexLine), Scope),
     
-    % ETAPE 2 : Assumer Ant
+    % STEP 2: Assume Ant
     AssLine is ExtractLine + 1,
     assert_safe_fitch_line(AssLine, Ant, assumption, Scope),
     render_hypo(Scope, Ant, 'AS', ExtractLine, AssLine, V1, V2),
     NewScope is Scope + 1,
     
-    % ETAPE 3 : Prouver Inter avec [Ant, (Inter=>Cons) | Context]
+    % STEP 3: Prove Inter with [Ant, (Inter=>Cons) | Context]
     fitch_g4_proof(SP1, [AssLine:Ant, ExtractLine:(Inter => Cons)|Context],
                   NewScope, AssLine, SubEnd, InterLine, V2, V3),
     
-    % ETAPE 4 : Deriver (Ant => Inter) par ->I
+    % STEP 4: Derive (Ant => Inter) by ->I
     ImpLine is SubEnd + 1,
     assert_safe_fitch_line(ImpLine, (Ant => Inter), rcond(AssLine, InterLine), Scope),
     format(atom(Just1), '$ \\to I $ ~w-~w', [AssLine, InterLine]),
     render_have(Scope, (Ant => Inter), Just1, SubEnd, ImpLine, V3, V4),
     
-    % ETAPE 5 : Deriver Cons par ->E
+    % STEP 5: Derive Cons by ->E
     MPLine is ImpLine + 1,
     assert_safe_fitch_line(MPLine, Cons, l0cond(ComplexLine, ImpLine), Scope),
     format(atom(Just2), '$ \\to E $ ~w,~w', [ComplexLine, ImpLine]),
     render_have(Scope, Cons, Just2, ImpLine, MPLine, V4, V5),
     
-    % ETAPE 6 : Continuer avec SP2
+    % STEP 6: Continue with SP2
     fitch_g4_proof(SP2, [MPLine:Cons, ImpLine:(Ant => Inter), ExtractLine:(Inter => Cons)|Context],
                   Scope, MPLine, NextLine, ResLine, V5, VarOut).
+
 % =========================================================================
-% REGLES DE QUANTIFICATION
+% QUANTIFICATION RULES
 % =========================================================================
-% R?
+
+% R-forall
 fitch_g4_proof(rall((_ > [(![Z-X]:A)]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     fitch_g4_proof(SubProof, Context, Scope, CurLine, SubEnd, BodyLine, VarIn, V1),
     derive_formula(Scope, (![Z-X]:A), '$ \\forall I $ ~w', [BodyLine], rall(BodyLine),
                   SubEnd, NextLine, ResLine, V1, VarOut).
-% L? : Elimination Universelle
+
+% L-forall: Universal elimination
 fitch_g4_proof(lall((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     extract_new_formula(Premisses > _, SubProof, NewFormula),
     
-    % Trouver le quantificateur universel qui genere NewFormula
+    % Find the universal quantifier that generates NewFormula
     (
-        % Cas 1: NewFormula est une instance directe d'un universel dans Premisses
+        % Case 1: NewFormula is a direct instance of a universal in Premisses
         (
             member((![Z-X]:Body), Premisses),
-            % Verifier si Body (avec substitution) donne NewFormula
+            % Check if Body (with substitution) gives NewFormula
             strip_annotations_deep(Body, StrippedBody),
             strip_annotations_deep(NewFormula, StrippedNew),
             unifiable(StrippedBody, StrippedNew, _),
             UniversalFormula = (![Z-X]:Body)
         ;
-            % Cas 2: Chercher par structure equivalente
+            % Case 2: Search by equivalent structure
             member((![Z-X]:Body), Premisses),
             formulas_equivalent(Body, NewFormula),
             UniversalFormula = (![Z-X]:Body)
         ;
-            % Cas 3: Fallback - prendre le premier (comportement actuel)
+            % Case 3: Fallback - take the first (current behavior)
             select((![Z-X]:Body), Premisses, _),
             UniversalFormula = (![Z-X]:Body)
         )
@@ -2519,13 +2417,14 @@ fitch_g4_proof(lall((Premisses > _), SubProof), Context, Scope, CurLine, NextLin
     derive_and_continue(Scope, NewFormula, '$ \\forall E $ ~w', [UnivLine], lall(UnivLine),
                        SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
-% R?
+% R-exists
 fitch_g4_proof(rex((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     fitch_g4_proof(SubProof, Context, Scope, CurLine, SubEnd, _WitnessLine, VarIn, V1),
-    % ? CORRECTION : Referencer SubEnd (la ligne du temoin), pas WitnessLine
+    % CORRECTION: Reference SubEnd (witness line), not WitnessLine
     derive_formula(Scope, Goal, '$ \\exists I $ ~w', [SubEnd], rex(SubEnd),
                   SubEnd, NextLine, ResLine, V1, VarOut).
-% L?
+
+% L-exists
 fitch_g4_proof(lex((Premisses > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     select((?[Z-X]:Body), Premisses, _),
     find_context_line(?[Z-X]:Body, Context, ExistLine),
@@ -2539,12 +2438,13 @@ fitch_g4_proof(lex((Premisses > [Goal]), SubProof), Context, Scope, CurLine, Nex
       fitch_g4_proof(SubProof, [WitLine:Witness|Context], NewScope, WitLine, SubEnd, _GoalLine, V1, V2),
       ElimLine is SubEnd + 1,
       assert_safe_fitch_line(ElimLine, Goal, lex(ExistLine, WitLine, SubEnd), Scope),
-      % ? CORRECTION : Referencer SubEnd (derniere ligne de la sous-preuve)
+      % CORRECTION: Reference SubEnd (last line of subproof)
       format(atom(Just), '$ \\exists E $ ~w,~w-~w', [ExistLine, WitLine, SubEnd]),
       render_have(Scope, Goal, Just, SubEnd, ElimLine, V2, VarOut),
       NextLine = ElimLine, ResLine = ElimLine
     ).
-% L?? : Combined existential-disjunction 
+
+% L-exists-or: Combined existential-disjunction 
 fitch_g4_proof(lex_lor((_ > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     SP1 =.. [_, (Prem1 > _)|_],
     SP2 =.. [_, (Prem2 > _)|_],
@@ -2568,165 +2468,165 @@ fitch_g4_proof(lex_lor((_ > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLin
     render_have(Scope, Goal, ExistJust, DisjElim, ElimLine, V4, VarOut),
     NextLine = ElimLine, ResLine = ElimLine.
 
-% CQ_c : Classical quantifier conversion
+% CQ_c: Classical quantifier conversion
 fitch_g4_proof(cq_c((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     extract_new_formula(Premisses, SubProof, NewFormula),
     select((![Z-X]:A) => B, Premisses, _),
-    find_context_line((![Z-X]:A) => B, Context, Line),  % <- CORRECTION
+    find_context_line((![Z-X]:A) => B, Context, Line),
     derive_and_continue(Scope, NewFormula, '$ CQ_{c} $ ~w', [Line], cq_c(Line),
                        SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
-% CQ_m : Minimal quantifier conversion
+% CQ_m: Minimal quantifier conversion
 fitch_g4_proof(cq_m((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     extract_new_formula(Premisses, SubProof, NewFormula),
     select((?[Z-X]:A)=>B, Premisses, _),
-    find_context_line((?[Z-X]:A)=>B, Context, Line),  % <- CORRECTION : cherche la bonne ligne
+    find_context_line((?[Z-X]:A)=>B, Context, Line),
     derive_and_continue(Scope, NewFormula, '$ CQ_{m} $ ~w', [Line], cq_m(Line),
                        SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
 % =========================================================================
-% REGLES D'EGALITE (EQUALITY RULES)
-% =========================================================================
-% =========================================================================
-% REGLES D'EGALITE (EQUALITY RULES) - VERSION CORRIGEE
+% EQUALITY RULES
 % =========================================================================
 
-% Reflexivite
-fitch_g4_proof(eq_refl(D), _Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Reflexivity
+fitch_g4_proof(eq_refl(Delta), _Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [Goal],
+    Delta = [Goal],
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, Goal, eq_refl, Scope),
-    render_have(Scope, Goal, 'Leibniz', CurLine, DerLine, VarIn, VarOut),
+    render_have(Scope, Goal, '$ = I$', CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
-% Symetrie
-fitch_g4_proof(eq_sym(_G>D), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Symmetry
+fitch_g4_proof(eq_sym(_Gamma>Delta), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [A = B],
+    Delta = [A = B],
     find_context_line(B = A, Context, EqLine),
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, (A = B), eq_sym(EqLine), Scope),
-    format(atom(Just), 'Leibniz ~w', [EqLine]),
+    format(atom(Just), '$ = E $ ~w', [EqLine]),
     render_have(Scope, (A = B), Just, CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
-% Transitivite
-fitch_g4_proof(eq_trans(G>D), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Transitivity
+fitch_g4_proof(eq_trans(Gamma>Delta), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [A = C],
-    G = [A = B, B = C | _Rest],  % Pattern matching direct
+    Delta = [A = C],
+    Gamma = [A = B, B = C | _Rest],  % Direct pattern matching
     find_context_line(A = B, Context, Line1),
     find_context_line(B = C, Context, Line2),
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, (A = C), eq_trans(Line1, Line2), Scope),
-    format(atom(Just), 'Leibniz ~w,~w', [Line1, Line2]),
+    format(atom(Just), '$ = E$ ~w,~w', [Line1, Line2]),
     render_have(Scope, (A = C), Just, CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
-% Substitution (Leibniz) - CAS PRINCIPAL
-fitch_g4_proof(eq_subst(G>D), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Substitution (Leibniz) - MAIN CASE
+fitch_g4_proof(eq_subst(Gamma>Delta), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [Goal],
-    Goal \= (_ = _),  % Pas une egalite
+    Delta = [Goal],
+    Goal \= (_ = _),  % Not an equality
     
-    % Extraire l'egalite et le predicat de G
-    member(A = B, G),
-    member(Pred, G),
+    % Extract equality and predicate from Gamma
+    member(A = B, Gamma),
+    member(Pred, Gamma),
     Pred \= (_ = _),
     Pred \= (A = B),
     
-    % Verifier que Goal est Pred avec A remplace par B
+    % Verify that Goal is Pred with A replaced by B
     Pred =.. [PredName|Args],
     Goal =.. [PredName|GoalArgs],
     
-    % Trouver la position ou la substitution a lieu
+    % Find position where substitution occurs
     nth0(Pos, Args, A),
     nth0(Pos, GoalArgs, B),
     
-    % Trouver les numeros de ligne dans le contexte
+    % Find line numbers in context
     find_context_line(A = B, Context, EqLine),
     find_context_line(Pred, Context, PredLine),
     
     !,
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, Goal, eq_subst(EqLine, PredLine), Scope),
-    format(atom(Just), 'Leibniz ~w,~w', [EqLine, PredLine]),
+    format(atom(Just), '$ = E$ ~w,~w', [EqLine, PredLine]),
     render_have(Scope, Goal, Just, CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
 % Congruence
-fitch_g4_proof(eq_cong(_G>D), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+fitch_g4_proof(eq_cong(_Gamma>Delta), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [LHS = RHS],
+    Delta = [LHS = RHS],
     LHS =.. [F|ArgsL],
     RHS =.. [F|ArgsR],
     find_diff_pos(ArgsL, ArgsR, _Pos, TermL, TermR),
     find_context_line(TermL = TermR, Context, EqLine),
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, (LHS = RHS), eq_cong(EqLine), Scope),
-    format(atom(Just), 'Leibniz ~w', [EqLine]),
+    format(atom(Just), '$ = E$ ~w', [EqLine]),
     render_have(Scope, (LHS = RHS), Just, CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
-% Substitution dans egalite
-fitch_g4_proof(eq_subst_eq(G>D), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Substitution in equality
+fitch_g4_proof(eq_subst_eq(Gamma>Delta), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [Goal_LHS = Goal_RHS],
-    member(X = Y, G),
-    member(Ctx_LHS = Ctx_RHS, G),
+    Delta = [Goal_LHS = Goal_RHS],
+    member(X = Y, Gamma),
+    member(Ctx_LHS = Ctx_RHS, Gamma),
     find_context_line(X = Y, Context, XY_Line),
     find_context_line(Ctx_LHS = Ctx_RHS, Context, Ctx_Line),
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, (Goal_LHS = Goal_RHS), eq_subst_eq(XY_Line, Ctx_Line), Scope),
-    format(atom(Just), 'Leibniz ~w,~w', [XY_Line, Ctx_Line]),
+    format(atom(Just), '$ = E$ ~w,~w', [XY_Line, Ctx_Line]),
     render_have(Scope, (Goal_LHS = Goal_RHS), Just, CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
 
-% Transitivite en chaine
-fitch_g4_proof(eq_trans_chain(_G>D), _Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+% Chained transitivity
+fitch_g4_proof(eq_trans_chain(_Gamma>Delta), _Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
     !,
-    D = [A = C],
+    Delta = [A = C],
     DerLine is CurLine + 1,
     assert_safe_fitch_line(DerLine, (A = C), eq_trans_chain, Scope),
-    render_have(Scope, (A = C), 'Leibniz', CurLine, DerLine, VarIn, VarOut),
+    render_have(Scope, (A = C), '=E', CurLine, DerLine, VarIn, VarOut),
     NextLine = DerLine,
     ResLine = DerLine.
+
 % =========================================================================
 % FALLBACK
 % =========================================================================
+
 fitch_g4_proof(UnknownRule, _Context, _Scope, CurLine, CurLine, CurLine, VarIn, VarIn) :-
     format('% WARNING: Unknown rule ~w~n', [UnknownRule]).
+
 % =========================================================================
-%  END of FITCH PRINTER 
+%  END OF FITCH PRINTER 
 % =========================================================================
 % =========================================================================
 % NATURAL DEDUCTION PRINTER IN TREE STYLE  
 % =========================================================================
 % =========================================================================
-% DISPLAY PREMISS FOR TREE STYLE 
+% DISPLAY PREMISS LIST FOR TREE STYLE 
 % =========================================================================
-% render_premise_list_silent/5: Silent version for tree style
-render_premise_list_silent([], _, Line, Line, []) :- !.
+% render_premiss_list_silent/5: Silent version for tree style
+render_premiss_list_silent([], _, Line, Line, []) :- !.
 
-render_premise_list_silent([LastPremiss], Scope, CurLine, NextLine, [CurLine:LastPremiss]) :-
+render_premiss_list_silent([LastPremiss], Scope, CurLine, NextLine, [CurLine:LastPremiss]) :-
     !,
-    assert_safe_fitch_line(CurLine, LastPremiss, premise, Scope),
+    assert_safe_fitch_line(CurLine, LastPremiss, premiss, Scope),
     NextLine is CurLine + 1.
 
-render_premise_list_silent([Premiss|Rest], Scope, CurLine, NextLine, [CurLine:Premiss|RestContext]) :-
-    assert_safe_fitch_line(CurLine, Premiss, premise, Scope),
+render_premiss_list_silent([Premiss|Rest], Scope, CurLine, NextLine, [CurLine:Premiss|RestContext]) :-
+    assert_safe_fitch_line(CurLine, Premiss, premiss, Scope),
     NextCurLine is CurLine + 1,
-    render_premise_list_silent(Rest, Scope, NextCurLine, NextLine, RestContext).
+    render_premiss_list_silent(Rest, Scope, NextCurLine, NextLine, RestContext).
 
 % =========================================================================
-% INTERFACE TREE STYLE
+% TREE STYLE INTERFACE
 % =========================================================================
 render_nd_tree_proof(Proof) :-
     retractall(fitch_line(_, _, _, _)),
@@ -2735,28 +2635,17 @@ render_nd_tree_proof(Proof) :-
     detect_and_set_logic_level(TopFormula),
     catch(
         (
-            ( premise_list(PremissList), PremissList = [_|_] ->
-                render_premise_list_silent(PremissList, 0, 1, NextLine, InitialContext),
+            ( premiss_list(PremissList), PremissList = [_|_] ->
+                render_premiss_list_silent(PremissList, 0, 1, NextLine, InitialContext),
                 LastPremLine is NextLine - 1,
-                % Capture ResLine (6ème argument) qui est la ligne de conclusion
-                with_output_to(atom(_), fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, _, _ResLine, 0, _)),
-                
-                % FIX: Trouver la dernière ligne qui N'EST PAS une prémisse
-                findall(N, (fitch_line(N, _, Just, _), Just \= premise), DerivedLines),
-                ( DerivedLines = [] ->
-                    % Pas de ligne dérivée, utiliser la dernière prémisse (cas axiome pur)
-                    RootLine = LastPremLine
-                ;
-                    % Utiliser la dernière ligne dérivée
-                    max_list(DerivedLines, RootLine)
-                )
+                % Capture ResLine (6th argument) which is the conclusion line
+                with_output_to(atom(_), fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, _, ResLine, 0, _))
             ;
-                % Pas de prémisses
-                with_output_to(atom(_), fitch_g4_proof(Proof, [], 1, 0, _, ResLine, 0, _)),
-                RootLine = ResLine
+                % No premisses
+                with_output_to(atom(_), fitch_g4_proof(Proof, [], 1, 0, _, ResLine, 0, _))
             ),
-            % Utilisation de RootLine comme racine de l'arbre
-            collect_and_render_tree(RootLine)
+            % Use ResLine as the root of the tree
+            collect_and_render_tree(ResLine)
         ),
         Error,
         (
@@ -2777,16 +2666,16 @@ collect_and_render_tree(RootLineNum) :-
     ( SortedLines = [] ->
         write('% Empty proof tree'), nl
     ;
-        % Capture toutes les formules prémisses pour le wrapping conditionnel
-        findall(F, fitch_line(_, F, premise, _), AllPremises),
+        % Collect all premiss formulas for conditional wrapping
+        findall(F, fitch_line(_, F, premiss, _), AllPremisses),
 
         ( build_buss_tree(RootLineNum, SortedLines, Tree) ->
             
-            % Vérifie si la conclusion est simple (premisse/reiteration) ET qu'il y a plusieurs prémisses
+            % Check if the conclusion is simple (premiss/reiteration) AND there are multiple premisses
             % FIX: Check RootLineNum for justification, not just any line.
-            ( is_simple_conclusion(RootLineNum, AllPremises) ->
-                % Force la structure pour afficher TOUTES les prémisses comme branches
-                wrap_premises_in_tree(RootLineNum, AllPremises, FinalTree)
+            ( is_simple_conclusion(RootLineNum, AllPremisses) ->
+                % Force structure to display ALL premisses as branches
+                wrap_premisses_in_tree(RootLineNum, AllPremisses, FinalTree)
             ;
                 FinalTree = Tree
             ),
@@ -2802,27 +2691,27 @@ collect_and_render_tree(RootLineNum) :-
 compare_lines(Delta, N1-_-_-_, N2-_-_-_) :-
     compare(Delta, N1, N2).
 
-% Helper pour vérifier si la conclusion est une simple réitération ou une prémisse
+% Helper to check if conclusion is a simple reiteration or premiss
 % FIX: Ensures the justification check is for the RootLineNum.
-is_simple_conclusion(RootLineNum, AllPremises) :-
-    length(AllPremises, N),
-    N > 1, % Doit avoir plusieurs prémisses
+is_simple_conclusion(RootLineNum, AllPremisses) :-
+    length(AllPremisses, N),
+    N > 1, % Must have multiple premisses
     fitch_line(RootLineNum, _, Just, _), % Check RootLineNum's justification
-    ( Just = premise ; Just = reiteration(_) ),
+    ( Just = premiss ; Just = reiteration(_) ),
     !.
 
-% Helper pour forcer la création d'un nœud n-aire de prémisses
-wrap_premises_in_tree(RootLineNum, AllPremises, FinalTree) :-
-    % Crée une liste de premise_node(F) pour toutes les prémisses
-    findall(premise_node(F), member(F, AllPremises), PremiseTrees),
-    % Obtient la formule de conclusion
+% Helper to force creation of n-ary premiss node
+wrap_premisses_in_tree(RootLineNum, AllPremisses, FinalTree) :-
+    % Create a list of premiss_node(F) for all premisses
+    findall(premiss_node(F), member(F, AllPremisses), PremissTrees),
+    % Get the conclusion formula
     fitch_line(RootLineNum, FinalFormula, _, _),
     
-    % Crée le nœud forcé
-    FinalTree = n_ary_premise_node(FinalFormula, PremiseTrees).
+    % Create the forced node
+    FinalTree = n_ary_premiss_node(FinalFormula, PremissTrees).
 
 % =========================================================================
-% CONSTRUCTION D'ARBRE BUSSPROOFS
+% BUSSPROOFS TREE CONSTRUCTION
 % =========================================================================
 
 build_buss_tree(LineNum, FitchLines, Tree) :-
@@ -2832,17 +2721,17 @@ build_buss_tree(LineNum, FitchLines, Tree) :-
         fail
     ).
 
-% -- Réitération (Règle déplacée pour priorité, corrige P, Q |- P) --
+% -- Reiteration (Rule moved for priority, fixes P, Q |- P) --
 build_tree_from_just(reiteration(SourceLine), _LineNum, Formula, FitchLines, reiteration_node(Formula, SubTree)) :-
     !,
     build_buss_tree(SourceLine, FitchLines, SubTree).
 
-% -- Feuilles --
+% -- Leaves --
 build_tree_from_just(assumption, LineNum, Formula, _FitchLines, assumption_node(Formula, LineNum)) :- !.
 build_tree_from_just(axiom, _LineNum, Formula, _FitchLines, axiom_node(Formula)) :- !.
-build_tree_from_just(premise, _LineNum, Formula, _FitchLines, premise_node(Formula)) :- !.
+build_tree_from_just(premiss, _LineNum, Formula, _FitchLines, premiss_node(Formula)) :- !.
 
-% -- Règles Implication --
+% -- Implication Rules --
 % R->
 build_tree_from_just(rcond(HypNum, GoalNum), _LineNum, Formula, FitchLines, discharged_node(rcond, HypNum, Formula, SubTree)) :-
     !, build_buss_tree(GoalNum, FitchLines, SubTree).
@@ -2851,77 +2740,77 @@ build_tree_from_just(rcond(HypNum, GoalNum), _LineNum, Formula, FitchLines, disc
 build_tree_from_just(l0cond(MajLine, MinLine), _LineNum, Formula, FitchLines, binary_node(l0cond, Formula, TreeA, TreeB)) :-
     !, build_buss_tree(MajLine, FitchLines, TreeA), build_buss_tree(MinLine, FitchLines, TreeB).
 
-% L->-> (Règle spéciale G4)
+% L->-> (Special G4 Rule)
 build_tree_from_just(ltoto(Line), _LineNum, Formula, FitchLines, unary_node(ltoto, Formula, SubTree)) :-
     !, build_buss_tree(Line, FitchLines, SubTree).
 
-% -- Règles Disjonction --
-% R? (Intro Or)
+% -- Disjunction Rules --
+% R∨ (Intro Or)
 build_tree_from_just(ror(SubLine), _LineNum, Formula, FitchLines, unary_node(ror, Formula, SubTree)) :-
     !, build_buss_tree(SubLine, FitchLines, SubTree).
 
-% L? (Elim Or) - Ternaire
+% L∨ (Elim Or) - Ternary
 build_tree_from_just(lor(DisjLine, HypA, HypB, GoalA, GoalB), _LineNum, Formula, FitchLines,
                      ternary_node(lor, HypA, HypB, Formula, DisjTree, TreeA, TreeB)) :-
     !, build_buss_tree(DisjLine, FitchLines, DisjTree),
     build_buss_tree(GoalA, FitchLines, TreeA),
     build_buss_tree(GoalB, FitchLines, TreeB).
 
-% L?-> (Disjonction gauche vers flèche)
+% L∨-> (Left disjunction to conditional)
 build_tree_from_just(lorto(Line), _LineNum, Formula, FitchLines, unary_node(lorto, Formula, SubTree)) :-
     !, build_buss_tree(Line, FitchLines, SubTree).
 
-% -- Règles Conjonction --
-% L? (Elim And)
+% -- Conjunction Rules --
+% L∧ (Elim And)
 build_tree_from_just(land(ConjLine, _Which), _LineNum, Formula, FitchLines, unary_node(land, Formula, SubTree)) :-
     !, build_buss_tree(ConjLine, FitchLines, SubTree).
 build_tree_from_just(land(ConjLine), _LineNum, Formula, FitchLines, unary_node(land, Formula, SubTree)) :-
     !, build_buss_tree(ConjLine, FitchLines, SubTree).
 
-% R? (Intro And)
+% R∧ (Intro And)
 build_tree_from_just(rand(LineA, LineB), _LineNum, Formula, FitchLines, binary_node(rand, Formula, TreeA, TreeB)) :-
     !, build_buss_tree(LineA, FitchLines, TreeA), build_buss_tree(LineB, FitchLines, TreeB).
 
-% L?-> (Conjonction gauche vers flèche)
+% L∧-> (Left conjunction to conditional)
 build_tree_from_just(landto(Line), _LineNum, Formula, FitchLines, unary_node(landto, Formula, SubTree)) :-
     !, build_buss_tree(Line, FitchLines, SubTree).
 
-% -- Règles Falsum / Négation --
-% L? (Bot Elim)
+% -- Falsum / Negation Rules --
+% L⊥ (Bot Elim)
 build_tree_from_just(lbot(BotLine), _LineNum, Formula, FitchLines, unary_node(lbot, Formula, SubTree)) :-
     !, build_buss_tree(BotLine, FitchLines, SubTree).
 
-% IP (Preuve indirecte / Classique)
+% IP (Indirect proof / Classical)
 build_tree_from_just(ip(HypNum, BotNum), _LineNum, Formula, FitchLines, discharged_node(ip, HypNum, Formula, SubTree)) :-
     !, build_buss_tree(BotNum, FitchLines, SubTree).
 
-% -- Règles Quantificateurs --
-% L? (Exist Elim)
+% -- Quantifier Rules --
+% L∃ (Exist Elim)
 build_tree_from_just(lex(ExistLine, WitNum, GoalNum), _LineNum, Formula, FitchLines, 
                      discharged_node(lex, WitNum, Formula, ExistTree, GoalTree)) :-
     !,
     build_buss_tree(ExistLine, FitchLines, ExistTree), build_buss_tree(GoalNum, FitchLines, GoalTree).
 
-% R? (Exist Intro)
+% R∃ (Exist Intro)
 build_tree_from_just(rex(WitLine), _LineNum, Formula, FitchLines, unary_node(rex, Formula, SubTree)) :-
     !, build_buss_tree(WitLine, FitchLines, SubTree).
 
-% L? (Forall Elim)
+% L∀ (Forall Elim)
 build_tree_from_just(lall(UnivLine), _LineNum, Formula, FitchLines, unary_node(lall, Formula, SubTree)) :-
     !, build_buss_tree(UnivLine, FitchLines, SubTree).
 
-% R? (Forall Intro)
+% R∀ (Forall Intro)
 build_tree_from_just(rall(BodyLine), _LineNum, Formula, FitchLines, unary_node(rall, Formula, SubTree)) :-
     !, build_buss_tree(BodyLine, FitchLines, SubTree).
 
-% Conversions Quantificateurs
+% Quantifier Conversions
 build_tree_from_just(cq_c(Line), _LineNum, Formula, FitchLines, unary_node(cq_c, Formula, SubTree)) :-
     !, build_buss_tree(Line, FitchLines, SubTree).
 
 build_tree_from_just(cq_m(Line), _LineNum, Formula, FitchLines, unary_node(cq_m, Formula, SubTree)) :-
     !, build_buss_tree(Line, FitchLines, SubTree).
 
-% -- Règles d'Égalité --
+% -- Equality Rules --
 build_tree_from_just(eq_refl, _LineNum, Formula, _FitchLines, axiom_node(Formula)) :- !.
 
 build_tree_from_just(eq_sym(SourceLine), _LineNum, Formula, FitchLines, 
@@ -2952,64 +2841,64 @@ build_tree_from_just(Just, LineNum, Formula, _FitchLines, unknown_node(Just, Lin
     format('% WARNING: Unknown justification type: ~w~n', [Just]).
 
 % =========================================================================
-% RENDU RECURSIF DE L'ARBRE (Latex Bussproofs)
+% RECURSIVE TREE RENDERING (LaTeX Bussproofs)
 % =========================================================================
 
 % render_buss_tree(+Tree)
-% Genere les commandes LaTeX pour l'arbre
+% Generates LaTeX commands for the tree
 
-% -- Feuilles --
+% -- Leaves --
 render_buss_tree(axiom_node(F)) :-
     write('\\AxiomC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-render_buss_tree(premise_node(F)) :-
+render_buss_tree(premiss_node(F)) :-
     write('\\AxiomC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% -- Hypothèses (STYLE CORRIGÉ: Numéro en petite taille, noLine, Formule) --
+% -- Assumptions (FIXED STYLE: Number in small size, noLine, Formula) --
 render_buss_tree(assumption_node(F, HypNum)) :-
-    format('\\AxiomC{\\scriptsize{~w}}', [HypNum]), nl, % Ajout de \scriptsize
+    format('\\AxiomC{\\scriptsize{~w}}', [HypNum]), nl,
     write('\\noLine'), nl,
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% -- Réitération --
+% -- Reiteration --
 render_buss_tree(reiteration_node(F, SubTree)) :-
     render_buss_tree(SubTree),
-    % Correction: Utilisation de write/nl pour s'assurer que l'inférence est rendue
+    % Fix: Use write/nl to ensure inference is rendered
     write('\\RightLabel{\\scriptsize{R}}'), nl,
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% -- Noeuds N-aires FORCÉS pour l'affichage de toutes les prémisses (cas simple conclusion) --
-render_buss_tree(n_ary_premise_node(F, Trees)) :-
-    % 1. Rendu de tous les sous-arbres (prémisses)
+% -- N-ary FORCED nodes for displaying all premisses (simple conclusion case) --
+render_buss_tree(n_ary_premiss_node(F, Trees)) :-
+    % 1. Render all subtrees (premisses)
     maplist(render_buss_tree, Trees),
     
-    % 2. Ajout de l'étiquette Wk (Weakening)
+    % 2. Add Wk (Weakening) label
     write('\\RightLabel{\\scriptsize{Wk}}'), nl,
     
-    % 3. Utilisation de BinaryInfC si N=2 (P et Q)
+    % 3. Use BinaryInfC if N=2 (P and Q)
     length(Trees, N),
     ( N = 2 ->
-        % La commande BinayInfC prend les deux dernières AxiomC, correspondant exactement à la demande P, Q |- P
+        % BinaryInfC command takes the last two AxiomC, exactly matching the P, Q |- P requirement
         write('\\BinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl
     ;
-        % Pour N > 2, nous utilisons TrinaryInfC si possible, sinon un message
+        % For N > 2, use TrinaryInfC if possible, otherwise a message
         ( N = 3 ->
             write('\\TrinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl
         ;
-            % Si N>3 (peu probable pour une preuve simple), on se rabat sur BinaryInfC pour garder le document compilable
-            format('% Warning: Simplified N=~w inference to BinaryInfC for display.', [N]), nl,
+            % If N>3 (unlikely for simple proof), fall back to BinaryInfC to keep document compilable
+            format('% Warning: Simplified N=~w inference to BinaryInfC for display.~n', [N]),
             write('\\BinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl
         )
     ).
 
-% -- Noeuds Unaires --
+% -- Unary Nodes --
 render_buss_tree(unary_node(Rule, F, SubTree)) :-
     render_buss_tree(SubTree),
     format_rule_label(Rule, Label),
     format('\\RightLabel{\\scriptsize{~w}}~n', [Label]),
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% -- Noeuds Binaires --
+% -- Binary Nodes --
 render_buss_tree(binary_node(Rule, F, TreeA, TreeB)) :-
     render_buss_tree(TreeA),
     render_buss_tree(TreeB),
@@ -3017,33 +2906,32 @@ render_buss_tree(binary_node(Rule, F, TreeA, TreeB)) :-
     format('\\RightLabel{\\scriptsize{~w}}~n', [Label]),
     write('\\BinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-
-% -- Noeuds Ternaires --
+% -- Ternary Nodes --
 render_buss_tree(ternary_node(Rule, HypA, HypB, F, TreeA, TreeB, TreeC)) :-
     render_buss_tree(TreeA),
     render_buss_tree(TreeB),
     render_buss_tree(TreeC),
     format_rule_label(Rule, Label),
     ( Rule = lor -> 
-        format('\\RightLabel{\\scriptsize{~w}~w,~w}~n', [Label, HypA, HypB])
+        format('\\RightLabel{\\scriptsize{~w} ~w,~w}~n', [Label, HypA, HypB])
     ; 
         format('\\RightLabel{\\scriptsize{~w}}~n', [Label])
     ),
     write('\\TrinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% -- Noeuds avec Déchargement (Hypothèses) --
+% -- Nodes with Discharge (Assumptions) --
 render_buss_tree(discharged_node(Rule, HypNum, F, SubTree)) :-
     render_buss_tree(SubTree),
     format_rule_label(Rule, BaseLabel),
-    % Indique l'indice de l'hypothèse déchargée à côté de la règle
-    format('\\RightLabel{\\scriptsize{~w} ~w}', [BaseLabel, HypNum]), nl,
+    % Indicate the discharged assumption index next to the rule
+    format('\\RightLabel{\\scriptsize{~w}  ~w}~n', [BaseLabel, HypNum]),
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
-% Cas spécial pour exists elimination
+% Special case for exists elimination
 render_buss_tree(discharged_node(lex, WitNum, F, ExistTree, GoalTree)) :-
     render_buss_tree(ExistTree),
     render_buss_tree(GoalTree),
-    format('\\RightLabel{\\scriptsize{$\\exists E$} ~w}', [WitNum]), nl,
+    format('\\RightLabel{\\scriptsize{$ \\exists E $ } ~w}~n', [WitNum]),
     write('\\BinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
 % Fallback
@@ -3052,46 +2940,39 @@ render_buss_tree(unknown_node(Just, _, F)) :-
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
 % =========================================================================
-% HELPER: LABELS DES REGLES
+% HELPER: RULE LABELS
 % =========================================================================
-format_rule_label(rcond, '$\\to I$').
-format_rule_label(l0cond, '$\\to E$').
-format_rule_label(ror, '$\\lor I$').
-format_rule_label(lor, '$\\lor E$').
-format_rule_label(land, '$\\land E$').
-format_rule_label(rand, '$\\land I$').
-format_rule_label(lbot, '$\\bot E$').
-format_rule_label(ip, 'IP').
-format_rule_label(lex, '$\\exists E$').
-format_rule_label(rex, '$\\exists I$').
-format_rule_label(lall, '$\\forall E$').
-format_rule_label(rall, '$\\forall I$').
-format_rule_label(ltoto, '$L\\to\\to$').
-format_rule_label(landto, '$L\\land\\to$').
-format_rule_label(lorto, '$L\\lor\\to$').
-format_rule_label(cq_c, '$CQ_c$').
-format_rule_label(cq_m, '$CQ_m$').
-format_rule_label(eq_refl, 'Refl').
-format_rule_label(eq_sym, 'Sym').
-format_rule_label(eq_trans, 'Trans').
-format_rule_label(eq_subst, '$ Leibniz $').
-format_rule_label(eq_cong, 'Cong').
-format_rule_label(eq_subst_eq, 'SubstEq').
+format_rule_label(rcond, '$ \\to I $').
+format_rule_label(l0cond, '$ \\to E $').
+format_rule_label(ror, '$ \\lor I $').
+format_rule_label(lor, '$ \\lor E $').
+format_rule_label(land, '$ \\land E $').
+format_rule_label(rand, '$ \\land I $').
+format_rule_label(lbot, '$ \\bot E $').
+format_rule_label(ip, ' IP ').
+format_rule_label(lex, '$ \\exists E $').
+format_rule_label(rex, '$ \\exists I $').
+format_rule_label(lall, '$ \\forall E $').
+format_rule_label(rall, '$ \\forall I $').
+format_rule_label(ltoto, '$ L\\to\\to $').
+format_rule_label(landto, '$ L\\land\\to $').
+format_rule_label(lorto, '$ L\\lor\\to $').
+format_rule_label(cq_c, ' $CQ_c $').
+format_rule_label(cq_m, '$ CQ_m $').
+format_rule_label(eq_refl, '$ = I $').
+format_rule_label(eq_sym, ' Sym ').
+format_rule_label(eq_trans, ' Trans ').
+format_rule_label(eq_subst, '$ = E $').
+format_rule_label(eq_cong, ' Cong ').
+format_rule_label(eq_subst_eq, ' SubstEq ').
 format_rule_label(X, X). % Fallback
 
-%========================================================================
-% END OF TREE STYLE PRINTER
-%========================================================================
-
 % =========================================================================
-% HELPER: WRAPPER POUR REWRITE
+% HELPER: WRAPPER FOR REWRITE
 % =========================================================================
-% CORRIGE: Utilise write_formula_with_parens/1 pour gerer correctement
-% le parenthesage des formules complexes dans les conditionnels.
-% Exemple: (P & Q) -> R  et non  P & Q -> R
 render_formula_for_buss(F) :-
     rewrite(F, 0, _, Latex),
-    write_formula_with_parens(Latex).
+    write(Latex).
 
 render_formula_for_buss(Formula) :-
     catch(
@@ -3101,7 +2982,7 @@ render_formula_for_buss(Formula) :-
     ).
 
 
-% Helper : detecter un arbre d'egalite
+% Helper: detect an equality tree
 is_equality_tree(binary_node(eq_subst, _, _, _)) :- !.
 is_equality_tree(binary_node(eq_trans, _, _, _)) :- !.
 is_equality_tree(binary_node(eq_subst_eq, _, _, _)) :- !.
@@ -3109,12 +2990,12 @@ is_equality_tree(unary_node(eq_sym, _, _)) :- !.
 is_equality_tree(unary_node(eq_cong, _, _)) :- !.
 is_equality_tree(axiom_node(_)) :- !.
 
-all_premises_used(_, []) :- !.
-all_premises_used(Tree, [P|Ps]) :-
+all_premisses_used(_, []) :- !.
+all_premisses_used(Tree, [P|Ps]) :-
     tree_contains_formula(Tree, P),
-    all_premises_used(Tree, Ps).
+    all_premisses_used(Tree, Ps).
 
-% Helper : enlever les annotations de variables
+% Helper: strip variable annotations
 strip_annotations(![_-X]:Body, ![X]:StrippedBody) :- 
     !, strip_annotations(Body, StrippedBody).
 strip_annotations(?[_-X]:Body, ?[X]:StrippedBody) :- 
@@ -3129,8 +3010,8 @@ strip_annotations(A <=> B, SA <=> SB) :-
     !, strip_annotations(A, SA), strip_annotations(B, SB).
 strip_annotations(F, F).
 
-% Matcher avec normalisation des annotations
-tree_contains_formula(premise_node(F), P) :- 
+% Match with annotation normalization
+tree_contains_formula(premiss_node(F), P) :- 
     !,
     strip_annotations(F, F_stripped),
     strip_annotations(P, P_stripped),
@@ -3158,9 +3039,13 @@ tree_contains_formula(discharged_node(_, _, _, SubTree), F) :-
     tree_contains_formula(SubTree, F).
 tree_contains_formula(discharged_node(_, _, _, TreeA, TreeB), F) :-
     (tree_contains_formula(TreeA, F) ; tree_contains_formula(TreeB, F)).
-
-
-% =======================
+% =========================================================================
+%   END OF ND TREE STYLE PRINTER 
+% =========================================================================
+%==========================================================================
+% LATEX  UTILITIES
+%========================================================================
+%========================
 % Fitch section
 % ========================
 
@@ -3168,7 +3053,7 @@ tree_contains_formula(discharged_node(_, _, _, TreeA, TreeB), F) :-
 % RENDERING PRIMITIVES
 % =========================================================================
 
-% render_hypo/7: Affiche une hypothese en Fitch style
+% render_hypo/7: Display a hypothesis in Fitch style
 
 render_hypo(Scope, Formula, Label, _CurLine, _NextLine, VarIn, VarOut) :-
     render_fitch_indent(Scope),
@@ -3192,7 +3077,7 @@ render_fitch_indent(N) :-
 
 render_have(Scope, Formula, Just, _CurLine, _NextLine, VarIn, VarOut) :-
     render_fitch_indent(Scope),
-    % Toujours ecrire \fa au niveau 0 (pour les sequents)
+    % Always write \fa at level 0 (for sequents)
     ( Scope = 0 -> write('\\fa ') ; true ),
     rewrite(Formula, VarIn, VarOut, LatexFormula),
     write_formula_with_parens(LatexFormula),
@@ -3248,17 +3133,17 @@ render_label(L) :-
     write('\\'), write('\\\n').
 
 % =========================================================================
-% REGLE SIMPLE : (Antecedent) => (Consequent) sauf pour les atomes
+% SIMPLE RULE: (Antecedent) => (Consequent) except for atoms
 % =========================================================================
 
-% Test si une formule est atomique
+% Test if a formula is atomic
 is_atomic_formula(Formula) :-
     atomic(Formula).
 
 % -------------------------------------------------------------------------
-% NOUVEAU : Test si une formule est une negation (au sens de l'affichage LaTeX)
-% Une formule negative est representee comme (' \\lnot ' X) par rewrite/4.
-% Nous voulons considerer toute formule commencant par ' \\lnot ' comme
+% NEW: Test if a formula is a negation (in LaTeX display sense)
+% A negative formula is represented as (' \\lnot ' X) par rewrite/4.
+% We want to consider any formula starting with ' \\lnot ' as
 % "non-parenthesable" - i.e. ne PAS entourer par des parentheses externe.
 % -------------------------------------------------------------------------
 is_negative_formula((' \\lnot ' _)) :- !.
@@ -3269,7 +3154,7 @@ is_atomic_or_negative_formula(F) :-
     is_negative_formula(F).
 
 % =========================================================================
-% TEST SI LE CORPS D'UN QUANTIFICATEUR NECESSITE PARENTHESES
+% TEST IF QUANTIFIER BODY NEEDS PARENTHESES
 % =========================================================================
 
 quantifier_body_needs_parens((_ ' \\to ' _)) :- !.
@@ -3286,10 +3171,10 @@ quantifier_body_needs_parens(Body) :-
     ; Body = (_ ' \\leftrightarrow ' _)
     ).
 % =========================================================================
-% TOUTES LES CLAUSES DE write_formula_with_parens/1 GROUPEES
+% ALL write_formula_with_parens/1 CLAUSES GROUPED
 % =========================================================================
 
-% Ecriture d'une implication avec parentheses intelligentes
+% Writing an implication with smart parentheses
 write_formula_with_parens((A ' \\to ' B)) :-
     !,
     write_implication_with_parens(A, B).
@@ -3321,7 +3206,7 @@ write_formula_with_parens((' \\lnot ' A)) :-
     write(' \\lnot '),
     write_with_context(A, 'not').
 
-% QUANTIFICATEURS AVEC PARENTHESES INTELLIGENTES
+% QUANTIFIERS WITH SMART PARENTHESES
 write_formula_with_parens((' \\forall ' X ' ' A)) :-
     !,
     write(' \\forall '),
@@ -3350,11 +3235,11 @@ write_formula_with_parens(Other) :-
     write(Other).
 
 % =========================================================================
-% FONCTION SPECIALISEE POUR IMPLICATIONS
+% SPECIALIZED FUNCTION FOR IMPLICATIONS
 % =========================================================================
 
 write_implication_with_parens(Antecedent, Consequent) :-
-    % Antecedent : ne pas parentheser s'il est atomique OU une formule negative
+    % Antecedent: do not parenthesize if atomic OR negative formula
     ( is_atomic_or_negative_formula(Antecedent) ->
         write_formula_with_parens(Antecedent)
     ;
@@ -3363,9 +3248,9 @@ write_implication_with_parens(Antecedent, Consequent) :-
         write(')')
     ),
     write(' \\to '),
-    % Consequent : parentheser sauf si atomique OU formule negative
-    % NOTE: on considere toute forme (' \\lnot ' _) comme "negative" meme si
-    % elle contient plusieurs negations imbriquees (!!!A). Dans ce cas on ne
+    % Consequent: parenthesize except if atomic OR negative formula
+    % NOTE: we consider any form (' \\lnot ' _) as "negative" even if
+    % it contains several nested negations (!!!A). In this case we do not
     % met JAMAIS de parentheses externes autour de la negation.
     ( is_atomic_or_negative_formula(Consequent) ->
         write_formula_with_parens(Consequent)
@@ -3376,10 +3261,10 @@ write_implication_with_parens(Antecedent, Consequent) :-
     ).
 
 % =========================================================================
-% TOUTES LES CLAUSES DE write_with_context/2 GROUPEES
+% ALL write_with_context/2 CLAUSES GROUPED
 % =========================================================================
 
-% IMPLICATIONS dans tous les contextes - utiliser write_implication_with_parens
+% IMPLICATIONS in all contexts - use write_implication_with_parens
 write_with_context((A ' \\to ' B), 'lor_left') :-
     !,
     write('('),
@@ -3410,7 +3295,7 @@ write_with_context((A ' \\to ' B), 'not') :-
     write_implication_with_parens(A, B),
     write(')').
 
-% CONJONCTIONS dans disjonctions
+% CONJUNCTIONS in disjunctions
 write_with_context((A ' \\land ' B), 'lor_left') :-
     !,
     write('('),
@@ -3427,7 +3312,7 @@ write_with_context((A ' \\land ' B), 'lor_right') :-
     write_formula_with_parens(B),
     write(')').
 
-% CONJONCTIONS dans negations
+% CONJUNCTIONS in negations
 write_with_context((A ' \\land ' B), 'not') :-
     !,
     write('('),
@@ -3436,7 +3321,7 @@ write_with_context((A ' \\land ' B), 'not') :-
     write_formula_with_parens(B),
     write(')').
 
-% DISJONCTIONS dans negations
+% DISJUNCTIONS in negations
 write_with_context((A ' \\lor ' B), 'not') :-
     !,
     write('('),
@@ -3445,7 +3330,7 @@ write_with_context((A ' \\lor ' B), 'not') :-
     write_formula_with_parens(B),
     write(')').
 
-% DISJONCTIONS dans conjonctions
+% DISJUNCTIONS in conjunctions
 write_with_context((A ' \\lor ' B), 'land_left') :-
     !,
     write('('),
@@ -3462,33 +3347,33 @@ write_with_context((A ' \\lor ' B), 'land_right') :-
     write_formula_with_parens(B),
     write(')').
 
-% CLAUSE DE FALLBACK
+% FALLBACK CLAUSE
 write_with_context(Formula, _Context) :-
     write_formula_with_parens(Formula).
 
 % =========================================================================
-% SYSTEME BURSE adapte : rewrite direct sur formules avec operateurs standard
-% VERSION AVEC SIMPLIFICATION ELEGANTE DES PREDICATS
+% ADAPTED BURSE SYSTEM: direct rewrite on formulas with standard operators
+% VERSION WITH ELEGANT PREDICATE SIMPLIFICATION
 % =========================================================================
 
-% rewrite/4 - Version adaptee qui gere directement les formules
+% rewrite/4 - Adapted version that handles formulas directly
 rewrite(#, J, J, '\\bot') :- !.
 rewrite(# => #, J, J, '\\top') :- !.
 
-% NOUVELLE CLAUSE POUR GERER LES CONSTANTES DE SKOLEM
-% Convertit f_sk(K,_) en un nom simple comme 'a', 'b', etc.
+% NEW CLAUSE TO HANDLE SKOLEM CONSTANTS
+% Converts f_sk(K,_) to a simple name like 'a', 'b', etc.
 rewrite(f_sk(K,_), J, J, Name) :-
     !,
     rewrite_name(K, Name).
 
-% CAS DE BASE : formules atomiques
+% BASE CASE: atomic formulas
 rewrite(A, J, J, A_latex) :-
     atomic(A),
     !,
     toggle(A, A_latex).
 
-% Reconnait ((A => B) & (B => A)) (ou l'ordre inverse) comme A <=> B pour l'affichage LaTeX
-% Doit etre place AVANT la clause generique rewrite((A & B), ...)
+% Recognizes ((A => B) & (B => A)) (or reverse order) as A <=> B for LaTeX display
+% Must be placed BEFORE the generic rewrite((A & B), ...) clause
 rewrite((X & Y), J, K, (C ' \\leftrightarrow ' D)) :-
     % cas 1 : X = (A => B), Y = (B => A)
     ( X = (A => B), Y = (B => A)
@@ -3499,13 +3384,13 @@ rewrite((X & Y), J, K, (C ' \\leftrightarrow ' D)) :-
     rewrite(A, J, H, C),
     rewrite(B, H, K, D).
 
-% Conjonction avec operateur standard &
+% Conjunction with standard operator &
 rewrite((A & B), J, K, (C ' \\land ' D)) :-
     !,
     rewrite(A, J, H, C),
     rewrite(B, H, K, D).
 
-% Disjonction avec operateur standard |
+% Disjunction with standard operator |
 rewrite((A | B), J, K, (C ' \\lor ' D)) :-
     !,
     rewrite(A, J, H, C),
@@ -3517,19 +3402,19 @@ rewrite((A => #), J, K, (' \\lnot ' C)) :-
     rewrite(A, J, K, C).
 
 
-% Implication avec operateur standard =>
+% Implication with standard operator =>
 rewrite((A => B), J, K, (C ' \\to ' D)) :-
     !,
     rewrite(A, J, H, C),
     rewrite(B, H, K, D).
 
-% Biconditionnelle avec operateur standard <=>
+% Biconditional with standard operator <=>
 rewrite((A <=> B), J, K, (C ' \\leftrightarrow ' D)) :-
     !,
     rewrite(A, J, H, C),
     rewrite(B, H, K, D).
 
-% Negation avec operateur standard ~
+% Negation with standard operator ~
 rewrite((~A), J, K, (' \\lnot ' C)) :-
     !,
     rewrite(A, J, K, C).
@@ -3544,7 +3429,7 @@ rewrite((?[X-X]:A), J, K, (' \\exists ' X ' ' C)) :-
     !,
     rewrite(A, J, K, C).
 /*
-% QUANTIFICATEURS : Adapter les formules directement
+% QUANTIFIERS: Adapt formulas directly
 rewrite((![_X]:A), J, K, (' \\forall ' VarName ' ' C)) :-
     !,
     rewrite_name(J, VarName),
@@ -3566,7 +3451,7 @@ rewrite((?[X]:A), J, K, (' \\exists ' X ' ' C)) :-
     rewrite(A, J, K, C).  % Garder le même compteur
 % =========================================================================
 % SIMPLIFICATION ELEGANTE DES PREDICATS
-% P(x,y,z) -> Pxyz pour tous les predicats
+% P(x,y,z) -> Pxyz for all predicates
 % =========================================================================
 /*
 rewrite(Pred, J, K, SimplePred) :-
@@ -3595,7 +3480,7 @@ rewrite(Pred, J, K, SimplePred) :-
     rewrite_args_list(Args, J, K, SimpleArgs),
     concatenate_all([G|SimpleArgs], SimplePred).
 
-% PREDICATS ET TERMES (clause generale)
+% PREDICATES AND TERMS (general clause)
 rewrite(X, J, K, Y) :-
     X =.. [F|L],
     toggle(F, G),
@@ -3604,7 +3489,7 @@ rewrite(X, J, K, Y) :-
 
 
 % =========================================================================
-% PREDICATS AUXILIAIRES POUR LA SIMPLIFICATION
+% AUXILIARY PREDICATES FOR SIMPLIFICATION
 % =========================================================================
 
 all_simple_terms([]).
@@ -3648,7 +3533,7 @@ concatenate_all_impl([H|T], Result) :-
     atom_concat(H, TempResult, Result).
 
 % =========================================================================
-% TRAITEMENT DES LISTES ET TERMES
+% LIST AND TERM PROCESSING
 % =========================================================================
 
 rewrite_list([], J, J, []).
@@ -3666,8 +3551,8 @@ rewrite_term(f_sk(K,_), J, J, N) :-
     !,
     rewrite_name(K, N).
 
-% NOUVEAU : Si le terme est un atome simple (constante), NE PAS le capitaliser
-% Car il est argument d'un predicat/fonction
+% NEW: If the term is a simple atom (constant), DO NOT capitalize it
+% Because it is an argument of a predicate/function
 rewrite_term(X, J, J, X) :-
     atomic(X),
     !.
@@ -3717,20 +3602,20 @@ toggle_code(X, X).
 % SYSTEME PREPARE
 % =========================================================================
 
-prepare_sequent(PremisesList => Conclusion, PreparedPremises, PreparedConclusion) :-
-    is_list(PremisesList),
+prepare_sequent(PremissesList => Conclusion, PreparedPremisses, PreparedConclusion) :-
+    is_list(PremissesList),
     !,
-    prepare_premises_list(PremisesList, PreparedPremises),
+    prepare_premisses_list(PremissesList, PreparedPremisses),
     prepare(Conclusion, [], PreparedConclusion).
 
-prepare_sequent(Premises => Conclusion, [PreparedPremises], PreparedConclusion) :-
-    prepare(Premises, [], PreparedPremises),
+prepare_sequent(Premisses => Conclusion, [PreparedPremisses], PreparedConclusion) :-
+    prepare(Premisses, [], PreparedPremisses),
     prepare(Conclusion, [], PreparedConclusion).
 
-prepare_premises_list([], []) :- !.
-prepare_premises_list([H|T], [PreparedH|PreparedT]) :-
+prepare_premisses_list([], []) :- !.
+prepare_premisses_list([H|T], [PreparedH|PreparedT]) :-
     prepare(H, [], PreparedH),
-    prepare_premises_list(T, PreparedT).
+    prepare_premisses_list(T, PreparedT).
 
 prepare(#, _, #) :- !.
 
@@ -3817,32 +3702,32 @@ lambda_has('C'(P,_,_), W) :-
 
 %%%%%% Sequents
 
-% Determiner le type de preuve (theoreme ou sequent)
-% RENOMME pour eviter conflit avec proof_type/2 du driver
-% Cette fonction analyse la STRUCTURE d'une preuve G4, pas la syntaxe d'une formule
+% Determine proof type (theorem or sequent)
+% RENAMED to avoid conflict with proof_type/2 from driver
+% This function analyzes the STRUCTURE of a G4 proof, not the syntax of a formula
 proof_structure_type(Proof, Type) :-
-    proof_premises(Proof, Premisses),
+    proof_premisses(Proof, Premisses),
     (   Premisses = [] 
     ->  Type = theorem
     ;   Type = sequent
     ).
 
-% NOTE: Si proof_structure_type est utilisee quelque part, mettre a jour les appels.
-% Actuellement, elle ne semble appelee nulle part dans ce fichier.
+% NOTE: If proof_structure_type is used somewhere, update the calls.
+% Currently, it does not seem to be called anywhere in this file.
 
-% Generer les commandes Fitch selon le type et la position
+% Generate Fitch commands according to type and position
 fitch_prefix(sequent, LineNum, TotalPremisses, Prefix) :-
     (   LineNum =< TotalPremisses 
     ->  (   LineNum = TotalPremisses 
-        ->  Prefix = '\\fj '  % Gros drapeau pour derniere premisse
-        ;   Prefix = '\\fa '  % Ligne normale pour premisses
+        ->  Prefix = '\\fj '  % Big flag for last premiss
+        ;   Prefix = '\\fa '  % Normal line for premisses
         )
-    ;   Prefix = '\\fa '      % Ligne normale apres les premisses
+    ;   Prefix = '\\fa '      % Normal line after premisses
     ).
 
 fitch_prefix(theorem, Depth, _, Prefix) :-
     (   Depth > 0 
-    ->  Prefix = '\\fa \\fh '  % Petit drapeau pour hypotheses
+    ->  Prefix = '\\fa \\fh '  % Small flag for hypotheses
     ;   Prefix = '\\fa '       % Ligne normale au niveau 0
     ).
 
@@ -3851,7 +3736,7 @@ fitch_prefix(theorem, Depth, _, Prefix) :-
 % =========================================================================
 
 % =========================================================================
-% HELPERS POUR TREE RENDERING
+% HELPERS FOR TREE RENDERING
 % =========================================================================
 
 hypothesis_is_discharged(HypNum, FitchLines) :-
@@ -3891,7 +3776,7 @@ render_rule_name(lorto) :- write('L\\lor\\to').
 render_rule_name(ltoto) :- write('L\\to\\to').
 render_rule_name(cq_c) :- write('CQ_{c}').
 render_rule_name(cq_m) :- write('CQ_{m}').
-% Regles d'egalite -> Leibniz
+% Equality rules -> Leibniz
 render_rule_name(eq_subst) :- !, write('Leibniz').
 render_rule_name(eq_trans) :- !, write('Leibniz').
 render_rule_name(eq_subst_eq) :- !, write('Leibniz').
@@ -4059,10 +3944,10 @@ detect_and_set_logic_level(Formula) :-
 
 % =========================================================================
 % HEURISTIQUES DE DETECTION FOL
-% Une formule est FOL si elle contient :
+% A formula is FOL if it contains:
 % - Des quantificateurs (?, ?)
-% - Des applications de predicats p(t1,...,tn) avec n > 0
-% - Des egalites entre termes
+% - Predicate applications p(t1,...,tn) with n > 0
+% - Equalities between terms
 % - Des fonctions de Skolem
 % =========================================================================
 
@@ -4087,12 +3972,12 @@ contains_quantifier(Term) :-
     contains_quantifier(Arg).
 
 
-% Applications de predicats (termes composes qui ne sont pas des connecteurs)
+% Predicate applications (compound terms that are not connectives)
 contains_predicate_application(Term) :-
     compound(Term),
     \+ is_logical_connective_structure(Term),
     Term =.. [_F|Args],
-    Args \= [],  % Doit avoir au moins un argument
+    Args \= [],  % Must have at least one argument
     !.
 contains_predicate_application(Term) :-
     compound(Term),
@@ -4100,18 +3985,18 @@ contains_predicate_application(Term) :-
     member(Arg, Args),
     contains_predicate_application(Arg).
 
-% Structures de connecteurs logiques (a exclure)
+% Logical connective structures (to exclude)
 is_logical_connective_structure(_ => _).
 is_logical_connective_structure(_ & _).
 is_logical_connective_structure(_ | _).
 is_logical_connective_structure(_ <=> _).
-is_logical_connective_structure(_ = _).  % Egalite traitee separement
+is_logical_connective_structure(_ = _).  % Equality treated separately
 is_logical_connective_structure(~ _).
 is_logical_connective_structure(#).
 is_logical_connective_structure(![_-_]:_).
 is_logical_connective_structure(?[_-_]:_).
 
-% Egalite
+% Equality
 contains_equality(_ = _) :- !.
 contains_equality(Term) :-
     compound(Term),
@@ -4128,7 +4013,7 @@ contains_function_symbol(Term) :-
     contains_function_symbol(Arg).
 
 % =========================================================================
-% EXTRACTION DE LA FORMULE DEPUIS UNE PREUVE G4
+% FORMULA EXTRACTION FROM A G4 PROOF
 % =========================================================================
 
 extract_formula_from_proof(Proof, Formula) :-
@@ -4425,11 +4310,11 @@ print_warning(warning(list_implication, Msg)) :-
 
 print_warning(warning(list_implication_left, Msg)) :-
     format('   ?  Syntax error: ~w~n', [Msg]),
-    write('      -> Use [Premises] > [Conclusion] for sequents'), nl.
+    write('      -> Use [Premisses] > [Conclusion] for sequents'), nl.
 
 print_warning(warning(list_implication_right, Msg)) :-
     format('   ?  Syntax error: ~w~n', [Msg]),
-    write('      -> Use [Premises] > [Conclusion] for sequents'), nl.
+    write('      -> Use [Premisses] > [Conclusion] for sequents'), nl.
 
 print_warning(warning(atom_turnstile, Msg)) :-
     format('   ?  Syntax error: ~w~n', [Msg]),
@@ -4440,7 +4325,7 @@ print_warning(warning(atom_turnstile, Msg)) :-
 print_warning(warning(formula_turnstile, Msg)) :-
     format('   ?  Syntax error: ~w~n', [Msg]),
     write('      -> Use => for implications, > only for sequents'), nl,
-    write('      -> Sequent syntax: [Premises] > [Conclusions]'), nl.
+    write('      -> Sequent syntax: [Premisses] > [Conclusions]'), nl.
 
 % =========================================================================
 % UTILITY: AUTO-SUGGESTION (optional feature)
@@ -4462,935 +4347,4 @@ replace_bicond_with_eq(Term, Result) :-
     maplist(replace_bicond_with_eq, Args, NewArgs),
     Result =.. [F|NewArgs], !.
 replace_bicond_with_eq(Term, Term).
-
-% =========================================================================
-% EXAMPLES FOR TESTING
-% =========================================================================
-/*
-% Test cases:
-
-% Should warn (term <=> term):
-?- validate_and_warn(((a <=> b) & f(a)) => f(b), V).
-
-% Should NOT warn (formula <=> formula):
-?- validate_and_warn((p <=> q) => (p => q), V).
-
-% Should warn in FOL context:
-?- validate_and_warn(![x]:((x <=> a) => p(x)), V).
-
-% Should NOT warn in propositional context:
-?- validate_and_warn((a <=> b) => (b <=> a), V).  % if a,b are prop vars
-
-*/
-% =========================================================================
-% END OF MODULE
-% =========================================================================
-% =========================================================================
-% tests_pelletier.pl (mise a jour : Pel_18 corrigee en formule valide)
-% Suite silencieuse Pelletier + benchmarks avec safe_time_out fallback.
-% =========================================================================
-/*
-:- module(tests_pelletier,
-    [ run_pelletier/0,
-      run_pelletier_named/1,
-      pelletier_tests/1,
-      set_pelletier_timeout/1,
-      pelletier_timeout/1,
-      known_invalid/1
-    ]).
-
-:- use_module(library(lists)).
-*/
-% -------------------------------------------------------------------------
-% Timeout configurable (en secondes). Valeur par defaut : 10 secondes.
-% -------------------------------------------------------------------------
-:- dynamic pelletier_timeout/1.
-pelletier_timeout(10).
-
-set_pelletier_timeout(Secs) :-
-    ( number(Secs), Secs > 0 ->
-        retractall(pelletier_timeout(_)),
-        assertz(pelletier_timeout(Secs))
-    ;
-        throw(error(domain_error(positive_number, Secs), set_pelletier_timeout/1))
-    ).
-
-% -------------------------------------------------------------------------
-% safe_time_out/3: wrapper robuste pour executer Goal avec timeout.
-% - If time_out/3 exists, uses it.
-% - Else if call_with_time_limit/2 exists, uses it.
-% - Else runs goal without timeout.
-% Result: success | failed | time_out | error(E)
-% -------------------------------------------------------------------------
-safe_time_out(Goal, Secs, Result) :-
-    ( current_predicate(time_out/3) ->
-        catch(time_out(Goal, Secs, R), E, (Result = error(E), !)),
-        !,
-        map_time_out_result(R, Result)
-    ; current_predicate(call_with_time_limit/2) ->
-        catch((call_with_time_limit(Secs, Goal), Result = success),
-              time_limit_exceeded,
-              ( Result = time_out )),
-        !
-    ;
-        catch(( (call(Goal) -> Result = success ; Result = failed) ),
-              E,
-              ( Result = error(E) ))
-    ).
-
-map_time_out_result(time_out, time_out) :- !.
-map_time_out_result(success, success) :- !.
-map_time_out_result(failed, failed) :- !.
-map_time_out_result(R, success) :- R \= time_out, R \= failed, R \= success, !.
-
-% -------------------------------------------------------------------------
-% Liste des tests (Name - Formula)
-% Respecte la syntaxe du driver : predicats p,q,... ; constantes a,b,c,... ; vars v,w,x,y,z
-% Quantificateurs: ![x]: et ?[x]: (sans espace)
-% -------------------------------------------------------------------------
-:- multifile pelletier_tests/1.
-pelletier_tests([
-    'Pel_01_drinker' - (?[x]:(p(x) => ![y]:(p(y)))),
-    'Pel_02_dn_forall_exists' - ((~(![x]:p(x))) <=> (?[x]:(~p(x)))),
-    'Pel_03_forall_inst' - ((![x]:p(x)) => p(a)),
-    'Pel_04_forall_preserve_exist' - ((![x]:(p(x) => q(x))) => ((?[x]:p(x)) => ?[x]:q(x))),
-    'Pel_05_exists_conj_split' - ((?[x]:(p(x) & q(x))) => (?[x]:p(x) & ?[x]:q(x))),
-    'Pel_06_leibniz' - (((a = b) & p(a)) => p(b)),
-    'Pel_07_eq_sym' - ((a = b) <=> (b = a)),
-    'Pel_08_eq_trans' - (((a = b) & (b = c)) => (a = c)),
-    'Pel_09_quantifier_swap_failure' - ((![x]:(?[y]:r(x,y))) => ?[y]:(![x]:r(x,y))),
-    'Pel_10_exist_forall_exchange' - ((?[y]:(![x]:p(x,y))) => (![x]:(?[y]:p(x,y)))),
-    'Pel_11_existential_elim_schema' - ((?[x]:p(x)) => ((![x]:(p(x) => q)) => q)),
-    'Pel_12_univ_distrib_impl' - ((![x]:(p(x) => q)) <=> ((?[x]:p(x)) => q)),
-    'Pel_13_contraposition_classical' - ((p => q) <=> (~q => ~p)),
-    'Pel_14_material_implication' - (((~ p | q) <=> (p => q))),
-    'Pel_15_hypothetical_syllogism' - (((p => q) & (q => r)) => (p => r)),
-    'Pel_16_existential_preservation' - (((![x]:(p(x) => q(x))) & ?[x]:p(x)) => ?[x]:q(x)),
-    'Pel_17_biimp_to_impls' - ((p <=> q) => ((p => q) & (q => p))),
-    % Pel_18 corrected: ?x (P(x) ? Q(x)) ? (?x P(x)) ? (?x Q(x))  (valid)
-    'Pel_18_classical_choice' - ((?[x]:(p(x) | q(x))) <=> (?[x]:p(x) | ?[x]:q(x))),
-    'Pel_19_pelletier_sample1' - ((![x]:(p(x) => ?[y]:q(x,y))) => ?[y]:(![x]:(p(x) => q(x,y)))),
-    'Extra_01_drinker_variant' - (?[x]:(p(x) => ![y]:(p(y) | q(y)))),
-    'Extra_03_choice_like' - ((![x]:(p(x) => q(x)) & ?[x]:p(x)) => ?[x]:q(x)),
-    'Extra_04_equality_leibniz_pred' - (((a = b) & r(a)) => r(b)),
-    'Extra_05_mixed_quant' - ((?[x]:(![y]:r(x,y))) => (![y]:(?[x]:r(x,y)))),
-    'Extra_06_double_negation' - ((~ ~ p) => p),
-    'Extra_07_peirce_variant' - ((((p => q) => p) => p)),
-    'Extra_08_explosion' - ((p & ~ p) => #),
-    'Extra_09_transfer' - ((![x]:(p(x) & q(x))) => (![x]:p(x) & ![x]:q(x)))
-]).
-
-% -------------------------------------------------------------------------
-% known_invalid/1: tests intentionally skipped (none for Pel_18 anymore)
-% -------------------------------------------------------------------------
-:- dynamic known_invalid/1.
-% Example: known_invalid('Pel_XX').
-
-% -------------------------------------------------------------------------
-% Runner: run_pelletier/0
-% -------------------------------------------------------------------------
-run_pelletier :-
-    pelletier_tests(Tests),
-    writeln('=== PELLETIER / HARD FOL TEST SUITE (silent, timeout enabled) ==='),
-    run_pelletier_list(Tests, 1, 0, 0, 0, Tot),
-    Tot = [Total, Proven, Failed, Skipped],
-    nl,
-    format('Done: ~d tests. Proven: ~d. Failed: ~d. Skipped: ~d.~n', [Total, Proven, Failed, Skipped]),
-    writeln('===============================================================').
-
-run_pelletier_list([], _, Proved, Failed, Skipped, [Total,Proved,Failed,Skipped]) :-
-    Total is Proved + Failed + Skipped.
-run_pelletier_list([Name-Formula|Rest], N, PAcc, FAcc, SAcc, Tot) :-
-    format('~n[~d] ~w : ', [N, Name]),
-    ( known_invalid(Name) ->
-        writeln('SKIPPED (INVALID)'),
-        PAcc1 is PAcc, FAcc1 is FAcc, SAcc1 is SAcc + 1
-    ;
-        pelletier_timeout(TOSeconds),
-        catch(
-            ( safe_time_out((decide(Formula) -> Status = proved ; Status = not_proved), TOSeconds, Result),
-              interpret_safe_result(Result, Status, Outcome)
-            ),
-            E,
-            Outcome = error(E)
-        ),
-        report_outcome(Outcome),
-        ( Outcome = proved -> PAcc1 is PAcc + 1 ; PAcc1 is PAcc ),
-        ( Outcome = proved -> FAcc1 is FAcc ; FAcc1 is FAcc + 1 ),
-        SAcc1 is SAcc
-    ),
-    N1 is N + 1,
-    run_pelletier_list(Rest, N1, PAcc1, FAcc1, SAcc1, Tot).
-
-interpret_safe_result(time_out, _Status, timeout) :- !.
-interpret_safe_result(success, proved, proved) :- !.
-interpret_safe_result(success, not_proved, not_proved) :- !.
-interpret_safe_result(failed, _Status, not_proved) :- !.
-interpret_safe_result(error(E), _Status, error(E)) :- !.
-interpret_safe_result(_, Status, Outcome) :- ( Status == proved -> Outcome = proved ; Outcome = not_proved ).
-
-report_outcome(proved) :- writeln('PROVED').
-report_outcome(not_proved) :- writeln('NOT PROVED').
-report_outcome(timeout) :- writeln('TIMEOUT').
-report_outcome(error(E)) :- format('ERROR: ~w~n', [E]).
-
-% -------------------------------------------------------------------------
-% run single named test
-% -------------------------------------------------------------------------
-run_pelletier_named(Name) :-
-    pelletier_tests(Tests),
-    ( member(Name-Formula, Tests) ->
-        ( known_invalid(Name) ->
-            writeln('SKIPPED (INVALID)')
-        ;
-            pelletier_timeout(TOSeconds),
-            format('Running test ~w with timeout ~w seconds...~n', [Name, TOSeconds]),
-            catch(
-                ( safe_time_out((decide(Formula) -> writeln('PROVED') ; writeln('NOT PROVED')), TOSeconds, Res),
-                  ( Res == time_out -> writeln('TIMEOUT') ; true )
-                ),
-                E, format('ERROR: ~w~n', [E])
-            )
-        )
-    ;
-        format('Test ~w not found.~n', [Name])
-    ).
-
-% =========================================================================
-% END of Pelletier tests
-% =========================================================================
-
-% =================================================================
-% 1. BASIC TESTS - MINIMAL PROPOSITIONAL LOGIC
-% =================================================================
-% Identity and implication introduction tests
-test_identity_simple :-
-    write('1.'), nl,
-    prove(p => p).
-test_identity_complex :-
-    write('2.'), nl,
-    prove(p => (q => p)).
-test_permutation :-
-    write('3.'), nl,
-    prove(p => (q => (p & q))).
-% Conjunction tests
-test_conjunction_intro :-
-    write('4.'), nl,
-    prove((p & q) => (q & p)).
-test_conjunction_assoc :-
-    write('5.'), nl,
-    prove(((p & q) & r) => (p & (q & r))).
-% Disjunction tests
-test_disjunction_intro :-
-    write('6.'), nl,
-    prove(p => (p | q)).
-test_disjunction_comm :-
-    write('7.'), nl,
-    prove((p | q) => (q | p)).
-test_disjunction_elim :-
-    write('8.'), nl,
-    prove(((p => r) & (q => r)) => ((p | q) => r)).
-% Biconditional tests
-test_distrib_disj_over_conj :-
-        write('9.'),nl,
-        prove(((p | q) & (p | r)) <=> (p | (q & r))).
-test_biconditional_intro :-
-    write('10.'), nl,
-    prove((p => q) => ((q => p) => (p <=> q))).
-test_biconditional_elim :-
-    write('11.'), nl,
-    prove((p <=> q) => (p => q)).
-% Modus Tollens tests (CORRECTED)
-test_modus_tollens :-
-    write('12.'), nl,
-    prove(((p => q) & ~ q) => ~ p).
-test_modus_tollens_complex :-
-    write('13.'), nl,
-    prove(((p => (q => r)) & ~ r) => (p => ~ q)).
-test_absurdity_chain_m :-
-    write('14.'), nl,
-    prove(p => (~ p => #)).
-% Negation introduction/elimination tests
-test_negation_intro :-
-    write('15.'), nl,
-    prove((p => #) => ~ p).
-test_negation_elim :-
-    write('16.'), nl,
-    prove((p & ~ p) => #).
-% =================================================================
-% 2. INTUITIONISTIC TESTS - NEGATION
-% =================================================================
-% Contradiction tests
-test_contradiction_anything :-
-    write('17.'), nl,
-    prove(# => p).
-test_absurdity_chain_i :-
-    write('18.'), nl,
-    prove((~ p => #) <=> ((p => #) => p)).
-test_dn_Peirce :-
-    write('19.'), nl,
-    prove(~  ~  (((p => q) => p) => p)).
-test_dn_Dummett :-
-    write('20.'), nl,
-    prove(~  ~  ((p => q) | (q => p))).
-test_dn_Dummett :-
-    write('21.'), nl,
-    prove(~  ~  ((p => q) | (q => p))).
-test_dn_classical_contraposition :-
-    write('22.'), nl,
-    prove(~  ~  ((~  q => ~  p) <=> (p => q))).
-% =================================================================
-% 3. CLASSICAL TESTS - BEYOND INTUITIONISTIC LOGIC
-% =================================================================
-% Indirect proof tests
-test_indirect_proof :-
-    write('23.'), nl,
-    prove( ~  ~  p => p).
-test_excluded_middle :-
-    write('24.'), nl,
-    prove(p | ~  p).
-test_material_implication :-
-    write('25.'), nl,
-    prove((( ~  p | q) <=> (p => q))).
-% Classical contraposition tests
-test_contraposition_strong :-
-    write('26.'), nl,
-    prove(( ~  q => ~  p) => (p => q)).
-test_absurdity_chain_c :-
-    write('27.'), nl,
-    prove((~ p => #) => p), nl.
-% =================================================================
-% 4. QUANTIFIER TESTS - CORRECTED SYNTAX
-% =================================================================
-% Basic universal tests
-test_universal_intro :-
-    write('28.'), nl,
-    prove(![x]:(p(x) => p(x))).
-test_universal_elim :-
-    write('29.'), nl,
-    prove((![x]:p(x)) => p(a)).
-test_universal_distribution :-
-    write('30.'), nl,
-    prove((![x]:(p(x) => q(x))) => ((![x]:p(x)) => (![x]:q(x)))).
-% Basic existential tests
-test_existential_intro :-
-    write('31.'), nl,
-    prove(p(a) => (?[x]:p(x))).
-test_existential_elim :-
-    write('32.'), nl,
-    prove((?[x]:p(x)) => ((![x]:(p(x) => q)) => q)).
-test_mixed_quantifiers :-
-    write('33.'), nl,
-    prove((?[y]:(![x]:p(x,y))) => (![x]:(?[y]:p(x,y)))).
-test_quantifier_negation :-
-    write('34.'), nl,
-    prove((~ (![x]:p(x))) <=> (?[x]: ~  p(x))).
-test_Spinoza :-
-        write('35. Spinoza: "nothing is contingent" '), nl,
-        prove((![x]:(~ c(x) <=> (?[y]:n(y,x) | ?[z]:d(z,x))) & ![x]:(?[z]:d(z,x))) => ![x]: ~ c(x)).
-test_Lepage :-
-        write( '36. Lepage, Elements de logique contemporaine, p. 202, ex. 14*-g'), nl,
-        prove((![x]:(f(x) <=> g(x)) & ![x]:(h(x) <=> i(x)) & ?[x]:(i(x) & ![y]:(f(y) => j(y)))) => ?[x]:(h(x) & ![y]:(j(y) | ~ g(y)))).
-test_fol_instantiation :-
-    write('37.'), nl,
-    prove(![x]:p(x) => ?[x]:p(x)), nl.
-test_fol_quantifiers_permutation :-
-    write('38.'), nl,
-    prove((?[y]:(![x]:(f(x,y)))) => (![x]:(?[y]:(f(x,y))))), nl.
-test_russell_paradox :-
-    write('38. Russell'), nl,
-    prove((?[y]:(![x]:(~ b(x,x) <=> b(x,y)))) => #), nl.
-% =================================================================
-% 5. PREMISE TESTS - PRACTICAL REASONING
-% =================================================================
-% Modus ponens with premises
-test_modus_ponens :-
-    write('39.'), nl,
-    prove(((p => q) & p) => q).
-test_hypothetical_syllogism :-
-    write('40.'), nl,
-    prove(((p => q) & (q => r)) => (p => r)).
-test_disjunctive_syllogism :-
-    write('41.'), nl,
-    prove(((p | q) & ~  p ) => q).
-
-% Complex tests with quantifiers - SIMPLIFIED
-test_universal_instantiation :-
-    write('42.'), nl,
-    prove((![x]:(h(x) => m(x)) & h(a)) => m(a)).
-test_existential_generalization :-
-    write('43.'), nl,
-    prove(m(a) => ?[x]:m(x)).
-% =================================================================
-% 6. STRESS TESTS - COMPLEX FORMULAS
-% =================================================================
-test_complex_formula_1 :-
-    write('44.'), nl,
-    prove((![x]:(p(x) => q(x))) => ((![x]:p(x)) => (![x]:q(x)))).
-test_complex_formula_2 :-
-    write('45.'), nl,
-    prove(((p => q) & (r => s)) => ((p & r) => (q & s))).
-test_Pelletier_17 :-
-        write( '46. Pelletier 17' ),
-        prove( ( ( p & ( q => r ) ) => s ) <=> ( ( ~ p | q | s ) & ( ~ p | ~ r | s ) ) ).
-% =================================================================
-% TEST RUNNERS
-% =================================================================
-run_all_tests :-
-    write('========================================'), nl,
-    write('FOL PROVER TEST SUITE START'), nl,
-    write('========================================'), nl, nl,
-    % Minimal propositional tests
-    write('=== MINIMAL PROPOSITIONAL LOGIC ==='), nl,
-    test_identity_simple, nl,
-    test_identity_complex, nl,
-    test_permutation, nl,
-    test_conjunction_intro, nl,
-    test_conjunction_assoc, nl,
-    test_disjunction_intro, nl,
-    test_disjunction_comm, nl,
-    test_disjunction_elim, nl,
-    test_distrib_disj_over_conj, nl,
-    test_biconditional_intro, nl,
-    test_biconditional_elim, nl,
-    test_modus_tollens, nl,
-    test_modus_tollens_complex, nl,
-    test_absurdity_chain_m,nl,
-    test_negation_intro, nl,
-    test_negation_elim, nl,
-    
-    % Intuitionistic tests
-    write('=== INTUITIONISTIC LOGIC ==='), nl,
-    test_contradiction_anything, nl,
-    test_absurdity_chain_i, nl,
-    test_dn_Peirce, nl,
-    test_dn_Dummett,nl,
-    test_dn_classical_contraposition,nl,
-    
- 
-    % Classical tests
-    write('=== CLASSICAL LOGIC ==='), nl,
-    test_indirect_proof, nl,
-    test_excluded_middle, nl,
-    test_material_implication, nl,
-    test_contraposition_strong, nl,
-    
-    % Quantifier tests
-    write('=== QUANTIFIERS ==='), nl,
-    test_universal_intro, nl,
-    test_universal_elim, nl,
-    test_universal_distribution, nl,
-    test_existential_intro, nl,
-    test_existential_elim, nl,
-    test_mixed_quantifiers, nl,
-    test_quantifier_negation, nl,
-    test_Spinoza,nl,
-    test_Lepage,nl,
-    test_fol_instantiation,nl,
-    test_fol_quantifiers_permutation,nl,
-    test_russell_paradox,nl,
-    
-   
-    write('=== Usual logical truths ==='), nl,
-    test_modus_ponens, nl,
-    test_hypothetical_syllogism, nl,
-    test_disjunctive_syllogism, nl,
-    test_universal_instantiation, nl,
-    test_existential_generalization, nl,
-    
-    % Stress tests
-    write('=== STRESS TESTS ==='), nl,
-   % test_complex_formula_1, nl,
-    test_complex_formula_2, nl,
-    test_Pelletier_17,nl,
-    
-    write('========================================'), nl,
-    write('TEST SUITE END'), nl,
-    write('========================================'), nl,
-    !.
-
-% Quick tests for immediate verification
-quick_tests :-
-    write('=== QUICK TESTS ==='), nl,
-    test_identity_simple, nl,
-    test_modus_tollens, nl.
-
-% Individual MT test for debugging
-test_mt_only :-
-    write('=== ISOLATED MT TEST ==='), nl,
-    test_modus_tollens, nl.
-
-
-% =========================================================================
-% TESTS FOL - FORMULES SIMPLES
-% =========================================================================
-   
-%=================================================================
-% SEQUENT TESTS - PROPOSITIONAL LOGIC ONLY
-% Tests for sequents with premises (avoiding classical disjunction theorems)
-% =================================================================
-
-% =================================================================
-% 1. BASIC SEQUENT TESTS - MINIMAL LOGIC
-% =================================================================
-
-% Identity with premises
-test_seq_identity_premise :-
-    write('47.'), nl,
-    prove([p] > [p]), nl.
-
-test_seq_weakening :-
-    write('48.'), nl,
-    prove([p, q] > [p]), nl.
-
-test_seq_implication_intro :-
-    write('49.'), nl,
-    prove([p] > [q => p]), nl.
-
-% =================================================================
-% 2. CONJUNCTION SEQUENTS
-% =================================================================
-
-test_seq_conjunction_intro :-
-    write('50.'), nl,
-    prove([p, q] > [p & q]), nl.
-
-test_seq_conjunction_elim_left :-
-    write('51'), nl,
-    prove([p & q] > [p]), nl.
-
-test_seq_conjunction_elim_right :-
-    write('52.'), nl,
-    prove([p & q] > [q]), nl.
-
-test_seq_conjunction_comm :-
-    write('53.'), nl,
-    prove([p & q] > [q & p]), nl.
-
-test_seq_conjunction_assoc :-
-    write('54.'), nl,
-    prove([(p & q) & r] > [p & (q & r)]), nl.
-
-test_seq_conjunction_nested :-
-    write('55.'), nl,
-    prove([p, q, r] > [(p & q) & r]), nl.
-
-% =================================================================
-% 3. IMPLICATION SEQUENTS
-% =================================================================
-
-test_seq_modus_ponens :-
-    write('56.'), nl,
-    prove([p => q, p] > [q]), nl.
-
-test_seq_hypothetical_syllogism :-
-    write('57.'), nl,
-    prove([p => q, q => r] > [p => r]), nl.
-
-test_seq_implication_chain :-
-    write('58.'), nl,
-    prove([p => q, q => r, p] > [r]), nl.
-
-test_seq_curry :-
-    write('59.'), nl,
-    prove([(p & q) => r] > [p => (q => r)]), nl.
-
-test_seq_uncurry :-
-    write('60.'), nl,
-    prove([p => (q => r)] > [(p & q) => r]), nl.
-
-% =================================================================
-% 4. DISJUNCTION SEQUENTS (NON-CLASSICAL)
-% =================================================================
-
-test_seq_disj_intro_left :-
-    write('61.'), nl,
-    prove([p] > [(p | q)]), nl.
-
-test_seq_disj_intro_right :-
-    write('62.'), nl,
-    prove([q] > [(p | q)]), nl.
-
-test_seq_disj_elim :-
-    write('63.'), nl,
-    prove([(p | q), p => r, q => r] > [r]), nl.
-
-test_seq_disj_syllogism :-
-    write('64.'), nl,
-    prove([(p | q), ~ p] > [q]), nl.
-
-test_seq_disj_comm :-
-    write('65.'), nl,
-    prove([(p | q)] > [(q | p)]), nl.
-
-% =================================================================
-% 5. NEGATION SEQUENTS - INTUITIONISTIC
-% =================================================================
-
-test_seq_negation_intro :-
-    write('66.'), nl,
-    prove([p => #] > [~ p]), nl.
-
-test_seq_negation_elim :-
-    write('67.'), nl,
-    prove([p, ~ p] > [#]), nl.
-
-test_seq_explosion :-
-    write('68.'), nl,
-    prove([#] > [p]), nl.
-
-test_seq_modus_tollens :-
-    write('69.'), nl,
-    prove([p => q, ~ q] > [~ p]), nl.
-
-test_seq_contraposition_weak :-
-    write('70.'), nl,
-    prove([p => q] > [~ q => ~ p]), nl.
-
-test_seq_double_negation_intro :-
-    write('71.'), nl,
-    prove([p] > [~ ~ p]), nl.
-
-% =================================================================
-% 6. BICONDITIONAL SEQUENTS
-% =================================================================
-
-test_seq_biconditional_intro :-
-    write('72.'), nl,
-    prove([p => q, q => p] > [p <=> q]), nl.
-
-test_seq_biconditional_elim_left :-
-    write('73.'), nl,
-    prove([p <=> q] > [p => q]), nl.
-
-test_seq_biconditional_elim_right :-
-    write('74.'), nl,
-    prove([p <=> q] > [q => p]), nl.
-
-test_seq_biconditional_modus_ponens :-
-    write('75.'), nl,
-    prove([p <=> q, p] > [q]), nl.
-
-% =================================================================
-% 7. COMPLEX SEQUENTS - INTUITIONISTIC
-% =================================================================
-
-test_seq_complex_1 :-
-    write('76.'), nl,
-    prove([(p => q) , (q => r), p] > [r]), nl.
-
-test_seq_complex_2 :-
-    write('77.'), nl,
-    prove([p , (q | r)] > [((p & q) | (p & r))]), nl.
-
-test_seq_complex_3 :-
-    write('78.'), nl,
-    prove([(p | q) , (p | r)] > [(p | (q & r))]), nl.
-
-test_seq_complex_4 :-
-    write('79.'), nl,
-    prove([p => (q => r)] > [q => (p => r)]), nl.
-
-
-
-% =================================================================
-% 8. DOUBLE NEGATION SEQUENTS - INTUITIONISTIC
-% =================================================================
-
-test_seq_dn_peirce :-
-    write('80.'), nl,
-    prove([~ (((p => q) => p) => p)] > [#]), nl.
-
-test_seq_dn_lem :-
-    write('81.'), nl,
-    prove([~ (p | ~ p)] > [#]), nl.
-
-test_seq_dn_dummett :-
-    write('82.'), nl,
-    prove([~ ((p => q) | (q => p))] > [#]), nl.
-
-% =================================================================
-% TEST RUNNERS
-% =================================================================
-
-run_prop_seq :-
-    write('========================================'), nl,
-    write('SEQUENT TESTS - PROPOSITIONAL LOGIC'), nl,
-    write('========================================'), nl, nl,
-    
-    write('=== 1. BASIC SEQUENTS ==='), nl,
-    test_seq_identity_premise,
-    test_seq_weakening,
-    test_seq_implication_intro,
-    
-    write('=== 2. CONJUNCTION SEQUENTS ==='), nl,
-    test_seq_conjunction_intro,
-    test_seq_conjunction_elim_left,
-    test_seq_conjunction_elim_right,
-    test_seq_conjunction_comm,
-    test_seq_conjunction_assoc,
-    test_seq_conjunction_nested,
-    
-    write('=== 3. IMPLICATION SEQUENTS ==='), nl,
-    test_seq_modus_ponens,
-    test_seq_hypothetical_syllogism,
-    test_seq_implication_chain,
-    test_seq_curry,
-    test_seq_uncurry,
-    
-    write('=== 4. DISJUNCTION SEQUENTS ==='), nl,
-    test_seq_disj_intro_left,
-    test_seq_disj_intro_right,
-    test_seq_disj_elim,
-    test_seq_disj_syllogism,
-    test_seq_disj_comm,
-    
-    write('=== 5. NEGATION SEQUENTS ==='), nl,
-    test_seq_negation_intro,
-    test_seq_negation_elim,
-    test_seq_explosion,
-    test_seq_modus_tollens,
-    test_seq_contraposition_weak,
-    test_seq_double_negation_intro,
-    
-    write('=== 6. BICONDITIONAL SEQUENTS ==='), nl,
-    test_seq_biconditional_intro,
-    test_seq_biconditional_elim_left,
-    test_seq_biconditional_elim_right,
-    test_seq_biconditional_modus_ponens,
-    
-    write('=== 7. COMPLEX SEQUENTS ==='), nl,
-    test_seq_complex_1,
-    test_seq_complex_2,
-    test_seq_complex_3,
-    test_seq_complex_4,
-    
-    write('=== 8. DOUBLE NEGATION SEQUENTS ==='), nl,
-    test_seq_dn_peirce,
-    test_seq_dn_lem,
-    test_seq_dn_dummett,
-    
-    write('========================================'), nl,
-    write('SEQUENT TESTS END'), nl,
-    write('========================================'), nl,
-    !.
-
-% Quick tests
-quick_sequent_tests :-
-    write('=== QUICK SEQUENT TESTS ==='), nl,
-    test_seq_identity_premise,
-    test_seq_modus_ponens,
-    test_seq_disj_syllogism,
-    test_seq_ltoto_2,
-    write('=== QUICK TESTS END ==='), nl.
-% =================================================================
-% SEQUENT TESTS - FIRST ORDER LOGIC (FOL)
-% Tests for sequents with quantifiers and predicates
-% =================================================================
-
-% =================================================================
-% BASIC QUANTIFIER SEQUENTS
-% =================================================================
-test_seq_forall_elim :-
-    write('83.'), nl,
-    prove([![x]:p(x)] > [p(a)]).
-
-test_seq_exists_intro :-
-    write('84.'), nl,
-    prove([p(a)] > [?[x]:p(x)]).
-
-test_seq_exists_elim :-
-    write('85.'), nl,
-    prove([?[x]:p(x), ![x]:(p(x) => q)] > [q]).
-
-% =================================================================
-% QUANTIFIER DISTRIBUTION
-% =================================================================
-
-test_seq_forall_distribution :-
-    write('86.'), nl,
-    prove([![x]:(p(x) => q(x)), ![x]:p(x)] > [![x]:q(x)]).
-
-test_seq_exists_distribution :-
-    write('87.'), nl,
-    prove([?[x]:(p(x) & q(x))] > [?[x]:p(x) & ?[x]:q(x)]).
-
-test_seq_mixed_quantifiers :-
-    write('88.'), nl,
-    prove([?[y]:(![x]:p(x,y))] > [![x]:(?[y]:p(x,y))]).
-
-% =================================================================
-% QUANTIFIER NEGATION (DE MORGAN FOR QUANTIFIERS)
-% =================================================================
-
-test_seq_neg_forall :-
-    write('89.'), nl,
-    prove([~ (![x]:p(x))] <> [?[x]: ~ p(x)]).
-
-test_seq_neg_exists :-
-    write('90.'), nl,
-    prove([~ (?[x]:p(x))] <> [![x]: ~ p(x)]).
-
-% =================================================================
-% MODUS PONENS WITH QUANTIFIERS
-% =================================================================
-
-test_seq_forall_mp :-
-    write('91.'), nl,
-    prove([![x]:(p(x) => q(x)), p(a)] > [q(a)]).
-
-test_seq_exists_mp :-
-    write('92.'), nl,
-    prove([?[x]:p(x), ![x]:(p(x) => q(x))] > [?[x]:q(x)]).
-
-% =================================================================
-% CLASSICAL LOGIC WITH QUANTIFIERS
-% =================================================================
-
-test_seq_barber_paradox :-
-    write('93.'), nl,
-    prove([?[y]:(![x]:(~ b(x,x) <=> b(x,y)))] > [#]).
-
-test_seq_drinker :-
-    write('94.'), nl,
-    prove([~ #] > [?[x]:(d(x) => ![y]:d(y))]).
-
-% =================================================================
-% SYLLOGISMS WITH QUANTIFIERS
-% =================================================================
-
-test_seq_barbara :-
-    write('95.'), nl,
-    prove([![x]:(m(x) => p(x)), ![x]:(s(x) => m(x))] > [![x]:(s(x) => p(x))]).
-
-test_seq_darii :-
-    write('96.'), nl,
-    prove([![x]:(m(x) => p(x)), ?[x]:(s(x) & m(x))] > [?[x]:(s(x) & p(x))]).
-
-test_seq_socrates :-
-    write('97.'), nl,
-    prove([![x]:(h(x) => m(x)), h(socrates)] > [m(socrates)]).
-
-% =================================================================
-% EQUALITY REASONING
-% =================================================================
-
-test_seq_eq_reflexive :-
-    write('98.'), nl,
-    prove([~ #] > [a = a]).
-
-test_seq_eq_symmetric :-
-    write('99.'), nl,
-    prove([a = b] > [b = a]).
-
-test_seq_eq_transitive :-
-    write('100.'), nl,
-    prove([a = b, b = c] > [a = c]).
-
-test_seq_eq_substitution :-
-    write('101.'), nl,
-    prove([a = b, p(a)] > [p(b)]).
-
-test_seq_eq_congruence :-
-    write('102.'), nl,
-    prove([a = b] > [f(a) = f(b)]).
-
-% =================================================================
-% COMPLEX FOL SEQUENTS
-% =================================================================
-
-test_seq_spinoza :-
-    write('103. Spinoza'), nl,
-    prove([
-        ![x]:(~ c(x) <=> (?[y]:n(y,x) | ?[z]:d(z,x))),
-        ![x]:(?[z]:d(z,x))
-    ] > [![x]: ~ c(x)]).
-
-test_seq_lepage :-
-    write('104. Lepage'), nl,
-    prove([
-        ![x]:(f(x) <=> g(x)),
-        ![x]:(h(x) <=> i(x)),
-        ?[x]:(i(x) & ![y]:(f(y) => j(y)))
-    ] > [?[x]:(h(x) & ![y]:(j(y) | ~ g(y)))]).
-
-% =================================================================
-% BICONDITIONAL SEQUENTS
-% =================================================================
-
-test_seq_bicond_left :-
-    write('105.'), nl,
-    prove([a <=> b, a] > [b]).
-
-test_seq_bicond_right :-
-    write('106.'), nl,
-    prove([a => b, b => a] > [a <=> b]).
-
-test_seq_bicond_quantifier :-
-    write('107.'), nl,
-    prove([![x]:(p(x) <=> q(x)), p(a)] > [q(a)]).
-
-% =================================================================
-% TEST RUNNERS
-% =================================================================
-
-run_fol_seq :-
-        retractall(fitch_line(_, _, _, _)),      % <- Nettoyage global
-    retractall(abbreviated_line(_)),
-    write('========================================'), nl,
-    write('FOL SEQUENT TEST SUITE START'), nl,
-    write('========================================'), nl, nl,
-    
-    write('=== BASIC QUANTIFIERS ==='), nl,
-    test_seq_exists_intro, nl,
-    test_seq_exists_elim, nl,
-    
-    write('=== QUANTIFIER DISTRIBUTION ==='), nl,
-    test_seq_forall_distribution, nl,
-    test_seq_exists_distribution, nl,
-    test_seq_mixed_quantifiers, nl,
-    
-    write('=== QUANTIFIER NEGATION ==='), nl,
-    test_seq_neg_exists, nl,
-    test_seq_neg_forall, nl,
-    
-    write('=== MODUS PONENS WITH QUANTIFIERS ==='), nl,
-    test_seq_forall_mp, nl,
-    test_seq_exists_mp, nl,
-    
-    write('=== CLASSICAL FOL ==='), nl,
-    test_seq_barber_paradox, nl,
-    test_seq_drinker, nl,
-    
-    write('=== SYLLOGISMS ==='), nl,
-    test_seq_barbara, nl,
-    test_seq_darii, nl,
-    test_seq_socrates, nl,
-    
-    write('=== EQUALITY ==='), nl,
-    test_seq_eq_reflexive, nl,
-    test_seq_eq_symmetric, nl,
-    test_seq_eq_transitive, nl,
-    test_seq_eq_substitution, nl,
-    test_seq_eq_congruence, nl,
-    
-    write('=== COMPLEX FOL ==='), nl,
-    test_seq_spinoza, nl,
-    test_seq_lepage, nl,
-    
-    write('=== BICONDITIONALS ==='), nl,
-    test_seq_bicond_left, nl,
-    test_seq_bicond_right, nl,
-    test_seq_bicond_quantifier, nl,
-    
-    write('========================================'), nl,
-    write('FOL SEQUENT TEST SUITE END'), nl,
-    write('========================================'), nl.
-
-run_quick_fol_sequent_tests :-
-    write('=== QUICK FOL SEQUENT TESTS ==='), nl,
-    test_seq_forall_elim, nl,
-    test_seq_exists_intro, nl,
-    test_seq_socrates, nl,
-    test_seq_eq_transitive, nl,
-    write('=== QUICK TESTS END ==='), nl.
+%%% END OF PROVER ONLINE

@@ -1,0 +1,36 @@
+71:% Désactiver le banner automatique de SWI-Prolog
+2741:                % Capture ResLine (6ème argument) qui est la ligne de conclusion
+2744:                % FIX: Trouver la dernière ligne qui N'EST PAS une prémisse
+2747:                    % Pas de ligne dérivée, utiliser la dernière prémisse (cas axiome pur)
+2750:                    % Utiliser la dernière ligne dérivée
+2754:                % Pas de prémisses
+2780:        % Capture toutes les formules prémisses pour le wrapping conditionnel
+2785:            % Vérifie si la conclusion est simple (premisse/reiteration) ET qu'il y a plusieurs prémisses
+2788:                % Force la structure pour afficher TOUTES les prémisses comme branches
+2805:% Helper pour vérifier si la conclusion est une simple réitération ou une prémisse
+2809:    N > 1, % Doit avoir plusieurs prémisses
+2814:% Helper pour forcer la création d'un nœud n-aire de prémisses
+2816:    % Crée une liste de premise_node(F) pour toutes les prémisses
+2821:    % Crée le nœud forcé
+2835:% -- Réitération (Règle déplacée pour priorité, corrige P, Q |- P) --
+2845:% -- Règles Implication --
+2854:% L->-> (Règle spéciale G4)
+2858:% -- Règles Disjonction --
+2870:% L?-> (Disjonction gauche vers flèche)
+2874:% -- Règles Conjonction --
+2885:% L?-> (Conjonction gauche vers flèche)
+2889:% -- Règles Falsum / Négation --
+2898:% -- Règles Quantificateurs --
+2924:% -- Règles d'Égalité --
+2968:% -- Hypothèses (STYLE CORRIGÉ: Numéro en petite taille, noLine, Formule) --
+2974:% -- Réitération --
+2977:    % Correction: Utilisation de write/nl pour s'assurer que l'inférence est rendue
+2981:% -- Noeuds N-aires FORCÉS pour l'affichage de toutes les prémisses (cas simple conclusion) --
+2983:    % 1. Rendu de tous les sous-arbres (prémisses)
+2986:    % 2. Ajout de l'étiquette Wk (Weakening)
+2992:        % La commande BinayInfC prend les deux dernières AxiomC, correspondant exactement à la demande P, Q |- P
+3034:% -- Noeuds avec Déchargement (Hypothèses) --
+3038:    % Indique l'indice de l'hypothèse déchargée à côté de la règle
+3042:% Cas spécial pour exists elimination
+3562:    rewrite(A, J, K, C).  % Garder le même compteur
+3566:    rewrite(A, J, K, C).  % Garder le même compteur
