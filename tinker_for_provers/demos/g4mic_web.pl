@@ -2970,13 +2970,10 @@ format_rule_label(X, X). % Fallback
 % =========================================================================
 % HELPER: WRAPPER FOR REWRITE
 % =========================================================================
-render_formula_for_buss(F) :-
-    rewrite(F, 0, _, Latex),
-    write(Latex).
-
+% Unified: always use write_formula_with_parens for consistent formatting
 render_formula_for_buss(Formula) :-
     catch(
-        (rewrite(Formula, 0, _, LatexFormula), render_latex_formula(LatexFormula)),
+        (rewrite(Formula, 0, _, LatexFormula), write_formula_with_parens(LatexFormula)),
         _Error,
         (write('???'))
     ).
@@ -3197,9 +3194,9 @@ write_formula_with_parens((A ' \\land ' B)) :-
 
 write_formula_with_parens((A ' \\leftrightarrow ' B)) :-
     !,
-    write_with_context(A, 'equiv_left'),
+    write_bicond_component(A),
     write(' \\leftrightarrow '),
-    write_with_context(B, 'equiv_right').
+    write_bicond_component(B).
 
 write_formula_with_parens((' \\lnot ' A)) :-
     !,
@@ -3233,6 +3230,42 @@ write_formula_with_parens((' \\exists ' X ' ' A)) :-
 
 write_formula_with_parens(Other) :-
     write(Other).
+
+% =========================================================================
+% HELPER PREDICATES FOR BICONDITIONAL FORMATTING
+% =========================================================================
+
+% Helper: write biconditional component with parens if not a literal
+write_bicond_component(A) :-
+    is_latex_literal(A), !,
+    write_formula_with_parens(A).
+write_bicond_component(A ' \\to ' B) :- !,
+    % Implications need parentheses in biconditional context
+    write('('),
+    write_implication_with_parens(A, B),
+    write(')').
+write_bicond_component(A) :-
+    % Any other complex formula gets parentheses
+    write('('),
+    write_formula_with_parens(A),
+    write(')').
+
+% Check if a LaTeX formula is a literal (atom, negated atom, or predicate application)
+is_latex_literal(A) :-
+    atomic(A), !.
+is_latex_literal((' \\lnot ' A)) :-
+    atomic(A), !.
+is_latex_literal((' \\lnot ' (' \\lnot ' A))) :-
+    % Double negation of literal is still considered "atomic-like"
+    is_latex_literal(A), !.
+is_latex_literal(A) :-
+    compound(A),
+    A \= (_ ' \\to ' _),
+    A \= (_ ' \\land ' _),
+    A \= (_ ' \\lor ' _),
+    A \= (_ ' \\leftrightarrow ' _),
+    A \= (' \\lnot ' _),
+    !.
 
 % =========================================================================
 % SPECIALIZED FUNCTION FOR IMPLICATIONS
@@ -3345,6 +3378,15 @@ write_with_context((A ' \\lor ' B), 'land_right') :-
     write_formula_with_parens(A),
     write(' \\lor '),
     write_formula_with_parens(B),
+    write(')').
+
+% BICONDITIONALS in negations
+write_with_context((A ' \\leftrightarrow ' B), 'not') :-
+    !,
+    write('('),
+    write_bicond_component(A),
+    write(' \\leftrightarrow '),
+    write_bicond_component(B),
     write(')').
 
 % FALLBACK CLAUSE
@@ -3791,135 +3833,17 @@ render_rule_name(Rule) :- write(Rule).
 % LaTeX FORMULA RENDERING
 % =========================================================================
 
-render_latex_formula((A ' \\to ' B)) :-
-    !,
-    ( is_atomic_or_negative_formula(A) ->
-        render_latex_formula(A)
-    ;
-        write('('),
-        render_latex_formula(A),
-        write(')')
-    ),
-    write(' \\to '),
-    ( is_atomic_or_negative_formula(B) ->
-        render_latex_formula(B)
-    ;
-        write('('),
-        render_latex_formula(B),
-        write(')')
-    ).
+% =========================================================================
+% RENDER LATEX FORMULA - Unified with write_formula_with_parens
+% =========================================================================
+% Simply delegate to the unified formatting system
 
-render_latex_formula((A ' \\land ' B)) :-
-    !,
-    render_latex_with_parens(A, 'conj_left'),
-    write(' \\land '),
-    render_latex_with_parens(B, 'conj_right').
+render_latex_formula(Formula) :-
+    write_formula_with_parens(Formula).
 
-render_latex_formula((A ' \\lor ' B)) :-
-    !,
-    render_latex_with_parens(A, 'disj_left'),
-    write(' \\lor '),
-    render_latex_with_parens(B, 'disj_right').
+render_latex_with_parens(Formula, Context) :-
+    write_with_context(Formula, Context).
 
-render_latex_formula((A ' \\leftrightarrow ' B)) :-
-    !,
-    write('('),
-    render_latex_formula(A),
-    write(' \\leftrightarrow '),
-    render_latex_formula(B),
-    write(')').
-
-render_latex_formula('='(A, B)) :-
-    !,
-    write('('),
-    render_latex_formula(A),
-    write('='),
-    render_latex_formula(B),
-    write(')').
-
-render_latex_formula((' \\lnot ' A)) :-
-    !,
-    write(' \\lnot '),
-    render_latex_with_parens(A, 'neg').
-
-render_latex_formula((' \\forall ' X ' ' A)) :-
-    !,
-    write(' \\forall '),
-    write(X),
-    write(' '),
-    ( quantifier_body_needs_parens(A) ->
-        write('('),
-        render_latex_formula(A),
-        write(')')
-    ;
-        render_latex_formula(A)
-    ).
-
-render_latex_formula((' \\exists ' X ' ' A)) :-
-    !,
-    write(' \\exists '),
-    write(X),
-    write(' '),
-    ( quantifier_body_needs_parens(A) ->
-        write('('),
-        render_latex_formula(A),
-        write(')')
-    ;
-        render_latex_formula(A)
-    ).
-
-render_latex_formula('\\bot') :-
-    !,
-    write('\\bot').
-
-render_latex_formula(Atom) :-
-    atomic(Atom),
-    !,
-    write(Atom).
-
-render_latex_formula(Complex) :-
-    write(Complex).
-
-render_latex_with_parens((' \\lnot ' A), _Context) :-
-    !,
-    render_latex_formula((' \\lnot ' A)).
-
-render_latex_with_parens((A ' \\to ' B), Context) :-
-    needs_parens_in_context(' \\to ', Context),
-    !,
-    write('('),
-    render_latex_formula((A ' \\to ' B)),
-    write(')').
-
-render_latex_with_parens((A ' \\land ' B), Context) :-
-    needs_parens_in_context(' \\land ', Context),
-    !,
-    write('('),
-    render_latex_formula((A ' \\land ' B)),
-    write(')').
-
-render_latex_with_parens((A ' \\lor ' B), Context) :-
-    needs_parens_in_context(' \\lor ', Context),
-    !, write('('),
-    render_latex_formula((A ' \\lor ' B)), write(')').
-
-render_latex_with_parens(Formula, _Context) :- render_latex_formula(Formula).
-
-needs_parens_in_context(' \\to ', 'impl_left') :- !.
-needs_parens_in_context(' \\to ', 'conj_left') :- !.
-needs_parens_in_context(' \\to ', 'conj_right') :- !.
-needs_parens_in_context(' \\to ', 'disj_left') :- !.
-needs_parens_in_context(' \\to ', 'disj_right') :- !.
-needs_parens_in_context(' \\to ', 'neg') :- !.
-needs_parens_in_context(' \\land ', 'disj_left') :- !.
-needs_parens_in_context(' \\land ', 'disj_right') :- !.
-needs_parens_in_context(' \\land ', 'impl_left') :- !.
-needs_parens_in_context(' \\land ', 'neg') :- !.
-needs_parens_in_context(' \\lor ', 'conj_left') :- !.
-needs_parens_in_context(' \\lor ', 'conj_right') :- !.
-needs_parens_in_context(' \\lor ', 'impl_left') :- !.
-needs_parens_in_context(' \\lor ', 'neg') :- !.
-needs_parens_in_context(_, _) :- fail.
 % =========================================================================
 % END OF LATEX UTILITIES FILE
 % =========================================================================
