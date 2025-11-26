@@ -54,9 +54,13 @@ show_banner :-
     write('*         (mic: minimal, intuitionistic and classical logic)    *'), nl,
     write('*****************************************************************'), nl,
     nl,
-    write('Write below: '),nl,
-    write('  help. and press Enter to get help'), nl,
-    write('  examples. and press Enter to see examples'),nl.
+    write('Because g4mic_web.pl is a Prolog program:'),nl,
+    write('never forget the dot at the end of each request!'),nl,nl,
+    write('Usage:'),nl,
+    write('  prove(Formula).  - proof in three styles, with shareable URLs'), nl,
+    write('  decide(Formula). - concise mode '), nl,
+    write('  help.            - show help'), nl,
+    write('  examples.        - show examples'),nl.
 % =========================================================================
 % ITERATION LIMITS CONFIGURATION
 % =========================================================================
@@ -4271,4 +4275,5 @@ replace_bicond_with_eq(Term, Result) :-
     maplist(replace_bicond_with_eq, Args, NewArgs),
     Result =.. [F|NewArgs], !.
 replace_bicond_with_eq(Term, Term).
+
 %%% END OF PROVER ONLINE
