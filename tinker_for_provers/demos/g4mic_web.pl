@@ -2066,6 +2066,8 @@ g4_to_fitch_sequent(Proof, OriginalSequent) :-
     % DETECT: Has any rule been applied?
     ( LastLine = LastPremLine ->
         % No line added -> pure axiom -> display reiteration
+        NewLine is LastPremLine + 1,
+        assert_safe_fitch_line(NewLine, Conclusion, reiteration(ResLine), 0),
         write('\\fa '),
         rewrite(Conclusion, 0, _, LatexConclusion),
         write(LatexConclusion),
@@ -2642,14 +2644,24 @@ render_nd_tree_proof(Proof) :-
             ( premiss_list(PremissList), PremissList = [_|_] ->
                 render_premiss_list_silent(PremissList, 0, 1, NextLine, InitialContext),
                 LastPremLine is NextLine - 1,
-                % Capture ResLine (6th argument) which is the conclusion line
-                with_output_to(atom(_), fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, _, ResLine, 0, _))
+                % Capture ResLine (6th argument) and LastLine (5th) which is the conclusion line
+                with_output_to(atom(_), fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, LastLine, ResLine, 0, _)),
+                % If no line was added (pure axiom), add reiteration line
+                ( LastLine = LastPremLine ->
+                    NewLine is LastPremLine + 1,
+                    fitch_line(ResLine, Conclusion, _, _),
+                    assert_safe_fitch_line(NewLine, Conclusion, reiteration(ResLine), 0),
+                    RootLine = NewLine
+                ;
+                    RootLine = ResLine
+                )
             ;
                 % No premisses
-                with_output_to(atom(_), fitch_g4_proof(Proof, [], 1, 0, _, ResLine, 0, _))
+                with_output_to(atom(_), fitch_g4_proof(Proof, [], 1, 0, _, ResLine, 0, _)),
+                RootLine = ResLine
             ),
-            % Use ResLine as the root of the tree
-            collect_and_render_tree(ResLine)
+            % Use RootLine as the root of the tree
+            collect_and_render_tree(RootLine)
         ),
         Error,
         (
@@ -2732,7 +2744,8 @@ build_tree_from_just(reiteration(SourceLine), _LineNum, Formula, FitchLines, rei
 
 % -- Leaves --
 build_tree_from_just(assumption, LineNum, Formula, _FitchLines, assumption_node(Formula, LineNum)) :- !.
-build_tree_from_just(axiom, _LineNum, Formula, _FitchLines, axiom_node(Formula)) :- !.
+% Axiom in G4 (A |- A) must be rendered as R (reiteration) in tree-style ND
+build_tree_from_just(axiom, _LineNum, Formula, _FitchLines, reiteration_node(Formula, axiom_node(Formula))) :- !.
 build_tree_from_just(premiss, _LineNum, Formula, _FitchLines, premiss_node(Formula)) :- !.
 
 % -- Implication Rules --
@@ -2924,10 +2937,26 @@ render_buss_tree(ternary_node(Rule, HypA, HypB, F, TreeA, TreeB, TreeC)) :-
     write('\\TrinaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
 % -- Nodes with Discharge (Assumptions) --
+% For rcond (→I): check for vacuous discharge
+render_buss_tree(discharged_node(rcond, HypNum, F, SubTree)) :-
+    render_buss_tree(SubTree),
+    format_rule_label(rcond, BaseLabel),
+    % Check if discharge is vacuous (hypothesis doesn't appear in subtree)
+    ( tree_contains_assumption(SubTree, HypNum) ->
+        % Non-vacuous discharge: show hypothesis number
+        format('\\RightLabel{\\scriptsize{~w}  ~w}~n', [BaseLabel, HypNum])
+    ;
+        % Vacuous discharge: don't show hypothesis number
+        format('\\RightLabel{\\scriptsize{~w}}~n', [BaseLabel])
+    ),
+    write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
+
+% For other rules (ip, rall): ALWAYS show hypothesis number (never vacuous)
 render_buss_tree(discharged_node(Rule, HypNum, F, SubTree)) :-
+    Rule \= rcond,  % Already handled above
     render_buss_tree(SubTree),
     format_rule_label(Rule, BaseLabel),
-    % Indicate the discharged assumption index next to the rule
+    % Always indicate the discharged assumption index
     format('\\RightLabel{\\scriptsize{~w}  ~w}~n', [BaseLabel, HypNum]),
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
@@ -2983,14 +3012,6 @@ render_formula_for_buss(Formula) :-
     ).
 
 
-% Helper: detect an equality tree
-is_equality_tree(binary_node(eq_subst, _, _, _)) :- !.
-is_equality_tree(binary_node(eq_trans, _, _, _)) :- !.
-is_equality_tree(binary_node(eq_subst_eq, _, _, _)) :- !.
-is_equality_tree(unary_node(eq_sym, _, _)) :- !.
-is_equality_tree(unary_node(eq_cong, _, _)) :- !.
-is_equality_tree(axiom_node(_)) :- !.
-
 all_premisses_used(_, []) :- !.
 all_premisses_used(Tree, [P|Ps]) :-
     tree_contains_formula(Tree, P),
@@ -3040,6 +3061,44 @@ tree_contains_formula(discharged_node(_, _, _, SubTree), F) :-
     tree_contains_formula(SubTree, F).
 tree_contains_formula(discharged_node(_, _, _, TreeA, TreeB), F) :-
     (tree_contains_formula(TreeA, F) ; tree_contains_formula(TreeB, F)).
+
+% =========================================================================
+% VACUOUS DISCHARGE DETECTION
+% =========================================================================
+% tree_contains_assumption(+Tree, +HypNum)
+% Succeeds if assumption with number HypNum appears in Tree
+
+tree_contains_assumption(assumption_node(_, HypNum), HypNum) :- !.
+tree_contains_assumption(assumption_node(_, _), _) :- !, fail.
+
+tree_contains_assumption(reiteration_node(_, SubTree), HypNum) :-
+    !, tree_contains_assumption(SubTree, HypNum).
+
+tree_contains_assumption(unary_node(_, _, SubTree), HypNum) :-
+    !, tree_contains_assumption(SubTree, HypNum).
+
+tree_contains_assumption(binary_node(_, _, TreeA, TreeB), HypNum) :-
+    !, (tree_contains_assumption(TreeA, HypNum) ; tree_contains_assumption(TreeB, HypNum)).
+
+tree_contains_assumption(ternary_node(_, _, _, _, TreeA, TreeB, TreeC), HypNum) :-
+    !, (tree_contains_assumption(TreeA, HypNum) ; 
+        tree_contains_assumption(TreeB, HypNum) ; 
+        tree_contains_assumption(TreeC, HypNum)).
+
+tree_contains_assumption(discharged_node(_, _, _, SubTree), HypNum) :-
+    !, tree_contains_assumption(SubTree, HypNum).
+
+tree_contains_assumption(discharged_node(_, _, _, TreeA, TreeB), HypNum) :-
+    !, (tree_contains_assumption(TreeA, HypNum) ; tree_contains_assumption(TreeB, HypNum)).
+
+tree_contains_assumption(n_ary_premiss_node(_, Trees), HypNum) :-
+    !, member(Tree, Trees), tree_contains_assumption(Tree, HypNum).
+
+% Leaves that can't contain assumptions
+tree_contains_assumption(axiom_node(_), _) :- !, fail.
+tree_contains_assumption(premiss_node(_), _) :- !, fail.
+tree_contains_assumption(unknown_node(_, _, _), _) :- !, fail.
+
 % =========================================================================
 %   END OF ND TREE STYLE PRINTER 
 % =========================================================================
@@ -3086,53 +3145,6 @@ render_have(Scope, Formula, Just, _CurLine, _NextLine, VarIn, VarOut) :-
     write(Just),
     write('\\\\'), nl.
  
-render_lineno(J, K) :-
-   K is J+1.
-
-render_bars(0) :- !.
-render_bars(N) :-
-    write('\\fa  '),
-    M is N-1,
-    render_bars(M).
-
-render_label(L) :-
-    L =.. ['$ \\lor E $', DisjLine, Case1, Case2],
-    Case1 = (Start1-End1),
-    Case2 = (Start2-End2),
-    !,
-    write(' & '),
-    format(' $ \\lor E $ ~w,~w-~w,~w-~w', [DisjLine, Start1, End1, Start2, End2]),
-    write('\\'), write('\\\n').
-
-render_label(L) :-
-    L =.. [F,X,Y],
-    !,
-    write(' &  '),
-    write(' '),
-    write(F),
-    write(' '),
-    write(X),
-    write(', '),
-    write(Y),
-    write('\\'), write('\\\n').
-
-render_label(L) :-
-    L =.. [F,X],
-    !,
-    write(' & '),
-    write(' '),
-    write(F),
-    write(' '),
-    write(X),
-    write('\\'), write('\\\n').
-
-render_label(L) :-
-    !,
-    write(' & '),
-    write(' '),
-    write(L),
-    write('\\'), write('\\\n').
-
 % =========================================================================
 % SIMPLE RULE: (Antecedent) => (Consequent) except for atoms
 % =========================================================================
@@ -3164,13 +3176,6 @@ quantifier_body_needs_parens((_ ' \\lor ' _)) :- !.
 quantifier_body_needs_parens((_ ' \\leftrightarrow ' _)) :- !.
 quantifier_body_needs_parens(_) :- fail.
 
-
-quantifier_body_needs_parens(Body) :-
-    (Body = (_ ' \\to ' _)
-    ; Body = (_ ' \\land ' _) 
-    ; Body = (_ ' \\lor ' _)
-    ; Body = (_ ' \\leftrightarrow ' _)
-    ).
 % =========================================================================
 % ALL write_formula_with_parens/1 CLAUSES GROUPED
 % =========================================================================
@@ -3754,58 +3759,6 @@ fitch_prefix(theorem, Depth, _, Prefix) :-
 % =========================================================================
 % RENDU LATEX BUSSPROOFS
 % =========================================================================
-
-% =========================================================================
-% HELPERS FOR TREE RENDERING
-% =========================================================================
-
-hypothesis_is_discharged(HypNum, FitchLines) :-
-    member(_-_-Just-_, FitchLines),
-    justification_discharges(Just, HypNum).
-
-justification_discharges(rcond(HypNum, _), HypNum) :- !.
-justification_discharges(ip(HypNum, _), HypNum) :- !.
-justification_discharges(lor(_, HypA, HypB, _, _), HypNum) :- (HypNum = HypA ; HypNum = HypB), !.
-justification_discharges(lex(_, WitNum, _), WitNum) :- !.
-justification_discharges(_, _) :- fail.
-
-is_vacuous_discharge(HypNum, Tree, FitchLines) :-
-    member(HypNum-Formula-assumption-_, FitchLines),
-    \+ tree_uses_hypothesis(Tree, HypNum, Formula).
-
-tree_uses_hypothesis(hypothesis(N, F), HypNum, HypFormula) :- N == HypNum, F =@= HypFormula.
-tree_uses_hypothesis(unary_node(_, _, SubTree), HypNum, HypFormula) :- tree_uses_hypothesis(SubTree, HypNum, HypFormula).
-tree_uses_hypothesis(binary_node(_, _, TreeA, TreeB), HypNum, HypFormula) :-
-    ( tree_uses_hypothesis(TreeA, HypNum, HypFormula) ; tree_uses_hypothesis(TreeB, HypNum, HypFormula) ).
-tree_uses_hypothesis(ternary_node(_, _, _, _, TreeA, TreeB, TreeC), HypNum, HypFormula) :-
-    ( tree_uses_hypothesis(TreeA, HypNum, HypFormula) ; tree_uses_hypothesis(TreeB, HypNum, HypFormula) ; tree_uses_hypothesis(TreeC, HypNum, HypFormula) ).
-tree_uses_hypothesis(discharged_node(_, _, _, SubTree), HypNum, HypFormula) :- tree_uses_hypothesis(SubTree, HypNum, HypFormula).
-tree_uses_hypothesis(discharged_node(_, _, _, TreeA, TreeB), HypNum, HypFormula) :-
-    ( tree_uses_hypothesis(TreeA, HypNum, HypFormula) ; tree_uses_hypothesis(TreeB, HypNum, HypFormula) ).
-
-render_rule_name(ror) :- write('\\lor I').
-render_rule_name(lbot) :- write('\\bot E').
-render_rule_name(land) :- write('\\land E').
-render_rule_name(rand) :- write('\\land I').
-render_rule_name(rex) :- write('\\exists I').
-render_rule_name(lall) :- write('\\forall E').
-render_rule_name(rall) :- write('\\forall I').
-render_rule_name(l0cond) :- write('\\to E').
-render_rule_name(landto) :- write('\\land\\to E').
-render_rule_name(lorto) :- write('\\lor\\to E').
-render_rule_name(ltoto) :- write('\\to\\to E').
-render_rule_name(cq_c) :- write('CQ_{c}').
-render_rule_name(cq_m) :- write('CQ_{m}').
-% Equality rules -> Leibniz
-render_rule_name(eq_subst) :- !, write('= E').
-render_rule_name(eq_trans) :- !, write('= E').
-render_rule_name(eq_subst_eq) :- !, write('= E').
-render_rule_name(eq_sym) :- !, write('= E').
-render_rule_name(eq_cong) :- !, write('= E').
-render_rule_name(eq_refl) :- !, write(' = I').
-render_rule_name(eq_trans_chain) :- !, write('= E').
-% Fallback
-render_rule_name(Rule) :- write(Rule).
 
 % =========================================================================
 % LaTeX FORMULA RENDERING
