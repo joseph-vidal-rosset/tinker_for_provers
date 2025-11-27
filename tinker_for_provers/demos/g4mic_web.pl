@@ -2179,7 +2179,7 @@ fitch_g4_proof(landto((Premisses > _), SubProof), Context, Scope, CurLine, NextL
     extract_new_formula(Premisses, SubProof, NewFormula),
     select(((A & B) => C), Premisses, _),
     once(member(ImpLine:((A & B) => C), Context)),
-    derive_and_continue(Scope, NewFormula, 'L$ \\land \\to $ ~w', [ImpLine],
+    derive_and_continue(Scope, NewFormula, '$ \\land\\to E $ ~w', [ImpLine],
                        landto(ImpLine), SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
 % L-or-implies: Disjunction to implications
@@ -2193,12 +2193,12 @@ fitch_g4_proof(lorto((Premisses > _), SubProof), Context, Scope, CurLine, NextLi
         Line2 is CurLine + 2,
         assert_safe_fitch_line(Line1, F1, lorto(ImpLine), Scope),
         assert_safe_fitch_line(Line2, F2, lorto(ImpLine), Scope),
-        format(atom(Just), 'L$ \\lor \\to $ ~w', [ImpLine]),
+        format(atom(Just), '$ \\lor\\to E $ ~w', [ImpLine]),
         render_have(Scope, F1, Just, CurLine, Line1, VarIn, V1),
         render_have(Scope, F2, Just, Line1, Line2, V1, V2),
         fitch_g4_proof(SubProof, [Line2:F2, Line1:F1|Context], Scope, Line2, NextLine, ResLine, V2, VarOut)
     ; NewFormulas = [F1] ->
-        derive_and_continue(Scope, F1, 'L$ \\lor \\to $ ~w', [ImpLine],
+        derive_and_continue(Scope, F1, '$ \\lor\\to E $ ~w', [ImpLine],
                            lorto(ImpLine), SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut)
     ;
         fitch_g4_proof(SubProof, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut)
@@ -2351,7 +2351,7 @@ fitch_g4_proof(ltoto((Premisses > _), SP1, SP2), Context, Scope, CurLine, NextLi
     
     % STEP 1: Derive (Inter => Cons) by L->->
     ExtractLine is CurLine + 1,
-    format(atom(ExtractJust), 'L$ \\to \\to $ ~w', [ComplexLine]),
+    format(atom(ExtractJust), '$ \\to\\to E$ ~w', [ComplexLine]),
     render_have(Scope, (Inter => Cons), ExtractJust, CurLine, ExtractLine, VarIn, V1),
     assert_safe_fitch_line(ExtractLine, (Inter => Cons), ltoto(ComplexLine), Scope),
     
@@ -2958,9 +2958,9 @@ format_rule_label(lex, '$ \\exists E $').
 format_rule_label(rex, '$ \\exists I $').
 format_rule_label(lall, '$ \\forall E $').
 format_rule_label(rall, '$ \\forall I $').
-format_rule_label(ltoto, '$ L\\to\\to $').
-format_rule_label(landto, '$ L\\land\\to $').
-format_rule_label(lorto, '$ L\\lor\\to $').
+format_rule_label(ltoto, '$ \\to\\to E$').
+format_rule_label(landto, '$ \\land\\to E$').
+format_rule_label(lorto, '$ \\lor\\to E$').
 format_rule_label(cq_c, ' $CQ_c $').
 format_rule_label(cq_m, '$ CQ_m $').
 format_rule_label(eq_refl, '$ = I $').
@@ -3287,8 +3287,7 @@ write_implication_with_parens(Antecedent, Consequent) :-
     write(' \\to '),
     % Consequent: parenthesize except if atomic OR negative formula
     % NOTE: we consider any form (' \\lnot ' _) as "negative" even if
-    % it contains several nested negations (!!!A). In this case we do not
-    % met JAMAIS de parentheses externes autour de la negation.
+    % it contains several nested negations (~  ~ ~  A).
     ( is_atomic_or_negative_formula(Consequent) ->
         write_formula_with_parens(Consequent)
     ;
@@ -3398,7 +3397,7 @@ write_with_context(Formula, _Context) :-
     write_formula_with_parens(Formula).
 
 % =========================================================================
-% ADAPTED BURSE SYSTEM: direct rewrite on formulas with standard operators
+% ADAPTED J.B. SYSTEM: direct rewrite on formulas with standard operators
 % VERSION WITH ELEGANT PREDICATE SIMPLIFICATION
 % =========================================================================
 
@@ -3474,20 +3473,7 @@ rewrite((![X-X]:A), J, K, (' \\forall ' X ' ' C)) :-
 rewrite((?[X-X]:A), J, K, (' \\exists ' X ' ' C)) :-
     !,
     rewrite(A, J, K, C).
-/*
-% QUANTIFIERS: Adapt formulas directly
-rewrite((![_X]:A), J, K, (' \\forall ' VarName ' ' C)) :-
-    !,
-    rewrite_name(J, VarName),
-    J1 is J + 1,
-    rewrite(A, J1, K, C).
 
-rewrite((?[_X]:A), J, K, (' \\exists ' VarName ' ' C)) :-
-    !,
-    rewrite_name(J, VarName),
-    J1 is J + 1,
-    rewrite(A, J1, K, C).
-*/
 rewrite((![X]:A), J, K, (' \\forall ' X ' ' C)) :-
     !,
     rewrite(A, J, K, C).  % Garder le même compteur
@@ -3499,18 +3485,6 @@ rewrite((?[X]:A), J, K, (' \\exists ' X ' ' C)) :-
 % SIMPLIFICATION ELEGANTE DES PREDICATS
 % P(x,y,z) -> Pxyz for all predicates
 % =========================================================================
-/*
-rewrite(Pred, J, K, SimplePred) :-
-    Pred =.. [F|Args],
-    atom(F),
-    Args \= [],
-    all_simple_terms(Args),
-    !,
-    toggle(F, G),
-    rewrite_args_list(Args, J, K, SimpleArgs),
-    concatenate_all([G|SimpleArgs], SimplePred).
-*/
-
 % --- Replace the previous "concatenate predicate name and args" clause by this safer version.
 % We avoid applying this cosmetic concatenation to equality and other logical operators.
 rewrite(Pred, J, K, SimplePred) :-
@@ -3817,19 +3791,19 @@ render_rule_name(rex) :- write('\\exists I').
 render_rule_name(lall) :- write('\\forall E').
 render_rule_name(rall) :- write('\\forall I').
 render_rule_name(l0cond) :- write('\\to E').
-render_rule_name(landto) :- write('L\\land\\to').
-render_rule_name(lorto) :- write('L\\lor\\to').
-render_rule_name(ltoto) :- write('L\\to\\to').
+render_rule_name(landto) :- write('\\land\\to E').
+render_rule_name(lorto) :- write('\\lor\\to E').
+render_rule_name(ltoto) :- write('\\to\\to E').
 render_rule_name(cq_c) :- write('CQ_{c}').
 render_rule_name(cq_m) :- write('CQ_{m}').
 % Equality rules -> Leibniz
-render_rule_name(eq_subst) :- !, write('Leibniz').
-render_rule_name(eq_trans) :- !, write('Leibniz').
-render_rule_name(eq_subst_eq) :- !, write('Leibniz').
-render_rule_name(eq_sym) :- !, write('Leibniz').
-render_rule_name(eq_cong) :- !, write('Leibniz').
-render_rule_name(eq_refl) :- !, write('Leibniz').
-render_rule_name(eq_trans_chain) :- !, write('Leibniz').
+render_rule_name(eq_subst) :- !, write('= E').
+render_rule_name(eq_trans) :- !, write('= E').
+render_rule_name(eq_subst_eq) :- !, write('= E').
+render_rule_name(eq_sym) :- !, write('= E').
+render_rule_name(eq_cong) :- !, write('= E').
+render_rule_name(eq_refl) :- !, write(' = I').
+render_rule_name(eq_trans_chain) :- !, write('= E').
 % Fallback
 render_rule_name(Rule) :- write(Rule).
 
