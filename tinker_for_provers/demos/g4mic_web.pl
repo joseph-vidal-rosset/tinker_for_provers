@@ -2731,8 +2731,17 @@ wrap_premisses_in_tree(RootLineNum, AllPremisses, FinalTree) :-
 % =========================================================================
 
 build_buss_tree(LineNum, FitchLines, Tree) :-
-    ( member(LineNum-Formula-Just-_Scope, FitchLines) ->
-        build_tree_from_just(Just, LineNum, Formula, FitchLines, Tree)
+    ( member(LineNum-Formula-Just-Scope, FitchLines) ->
+        % Check if there's a more recent assumption with the same formula in a deeper scope
+        ( member(HypNum-Formula-assumption-HypScope, FitchLines),
+          HypNum > LineNum,
+          HypScope > Scope ->
+            % Use the hypothesis directly instead of reconstructing from LineNum
+            Tree = assumption_node(Formula, HypNum)
+        ;
+            % Normal case: build tree from justification
+            build_tree_from_just(Just, LineNum, Formula, FitchLines, Tree)
+        )
     ;
         fail
     ).
