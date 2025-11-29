@@ -2180,7 +2180,7 @@ fitch_g4_proof(l0cond((Premisses > _), SubProof), Context, Scope, CurLine, NextL
 fitch_g4_proof(landto((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
     extract_new_formula(Premisses, SubProof, NewFormula),
     select(((A & B) => C), Premisses, _),
-    once(member(ImpLine:((A & B) => C), Context)),
+    find_context_line(((A & B) => C), Context, ImpLine),
     derive_and_continue(Scope, NewFormula, '$ \\land\\to E $ ~w', [ImpLine],
                        landto(ImpLine), SubProof, Context, CurLine, NextLine, ResLine, VarIn, VarOut).
 
