@@ -2284,10 +2284,10 @@ fitch_g4_proof(ip((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, Re
     !,
     ( Goal = (A => #) ->
         Assumption = ((A => #) => #),
-        Rule = 'DNE_m'
+        Rule = '$ DNE_{m} $'
     ;
         Assumption = (Goal => #),
-        Rule = 'IP'
+        Rule = '$ IP $'
     ),
     HypLine is CurLine + 1,
     assert_safe_fitch_line(HypLine, Assumption, assumption, Scope),
@@ -2806,9 +2806,17 @@ build_tree_from_just(landto(Line), _LineNum, Formula, FitchLines, unary_node(lan
 build_tree_from_just(lbot(BotLine), _LineNum, Formula, FitchLines, unary_node(lbot, Formula, SubTree)) :-
     !, build_buss_tree(BotLine, FitchLines, SubTree).
 
-% IP (Indirect proof / Classical)
-build_tree_from_just(ip(HypNum, BotNum), _LineNum, Formula, FitchLines, discharged_node(ip, HypNum, Formula, SubTree)) :-
-    !, build_buss_tree(BotNum, FitchLines, SubTree).
+% IP (Indirect proof / Classical) - with DNE_m detection
+build_tree_from_just(ip(HypNum, BotNum), _LineNum, Formula, FitchLines, discharged_node(RuleName, HypNum, Formula, SubTree)) :-
+    !,
+    % Detect if hypothesis is ~~A (double negation)
+    ( member(HypNum-HypFormula-_-_, FitchLines),
+      HypFormula = ((_ => #) => #) ->
+        RuleName = dne_m
+    ;
+        RuleName = ip
+    ),
+    build_buss_tree(BotNum, FitchLines, SubTree).
 
 % -- Quantifier Rules --
 % L∃ (Exist Elim)
@@ -2991,7 +2999,8 @@ format_rule_label(lor, '$ \\lor E $').
 format_rule_label(land, '$ \\land E $').
 format_rule_label(rand, '$ \\land I $').
 format_rule_label(lbot, '$ \\bot E $').
-format_rule_label(ip, ' IP ').
+format_rule_label(ip, '$ IP $').
+format_rule_label(dne_m, '$ DNE_{m} $').
 format_rule_label(lex, '$ \\exists E $').
 format_rule_label(rex, '$ \\exists I $').
 format_rule_label(lall, '$ \\forall E $').
