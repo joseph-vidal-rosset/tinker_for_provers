@@ -2071,7 +2071,7 @@ g4_to_fitch_sequent(Proof, OriginalSequent) :-
         write('\\fa '),
         rewrite(Conclusion, 0, _, LatexConclusion),
         write(LatexConclusion),
-        format(' &  R ~w\\\\', [ResLine]), nl
+        format(' &  $ R $ ~w\\\\', [ResLine]), nl
     ;
         % A rule has already displayed the conclusion -> do nothing
         true
@@ -2898,7 +2898,7 @@ render_buss_tree(assumption_node(F, HypNum)) :-
 render_buss_tree(reiteration_node(F, SubTree)) :-
     render_buss_tree(SubTree),
     % Fix: Use write/nl to ensure inference is rendered
-    write('\\RightLabel{\\scriptsize{R}}'), nl,
+    write('\\RightLabel{\\scriptsize{$ R $}}'), nl,
     write('\\UnaryInfC{$'), render_formula_for_buss(F), write('$}'), nl.
 
 % -- N-ary FORCED nodes for displaying all premisses (simple conclusion case) --
@@ -2907,7 +2907,7 @@ render_buss_tree(n_ary_premiss_node(F, Trees)) :-
     maplist(render_buss_tree, Trees),
     
     % 2. Add Wk (Weakening) label
-    write('\\RightLabel{\\scriptsize{Wk}}'), nl,
+    write('\\RightLabel{\\scriptsize{$ R $}}'), nl,
     
     % 3. Use BinaryInfC if N=2 (P and Q)
     length(Trees, N),

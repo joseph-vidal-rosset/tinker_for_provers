@@ -1,0 +1,200 @@
+Welcome to SWI-Prolog (threaded, 64 bits, version 9.3.34-22-g656029f07)
+SWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.
+Please run ?- license. for legal details.
+
+    CMake built from "/usr/local/swipl-devel/build"
+
+For online help and background, visit https://www.swi-prolog.org
+For built-in help, use ?- help(Topic). or ?- apropos(Word).
+
+?- Welcome to SWI-Prolog (32 bits, version 9.3.34-20-g3517bc35f)
+SWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.
+For legal details and online help, see https://www.swi-prolog.org
+
+*****************************************************************
+*                   G4-mic F.O.L. PROVER  -  1.0                *
+*         (mic: minimal, intuitionistic and classical logic)    *
+*****************************************************************
+
+Because g4mic_web.pl is a Prolog program:
+never forget the dot at the end of each request!
+
+Usage:
+  prove(Formula).  - proof in three styles, with shareable URLs
+  decide(Formula). - concise mode 
+  help.            - show help
+  examples.        - show examples
+true.
+
+?- prove([p , q] > [p]).
+------------------------------------------
+G4 PROOF FOR SEQUENT: p, q |- p
+------------------------------------------
+MODE: Sequent 
+
+=== PHASE 1: Trying Minimal -> Intuitionistic -> Classical ===
+% 12 inferences, 0.000 CPU in 0.000 seconds (96% CPU, 386673 Lips)
+   Constructive proof found in MINIMAL LOGIC 
+G4 proofs in minimal logic
+
+
+
+- Sequent Calculus -
+
+\begin{prooftree}
+\AxiomC{}
+\RightLabel{\scriptsize{$Ax.$}}
+\UnaryInfC{$P, Q \vdash P$}
+\end{prooftree}
+
+Q.E.D.
+
+- Natural Deduction -
+a) Tree Style:
+
+\begin{prooftree}
+\AxiomC{$P$}
+\AxiomC{$Q$}
+\RightLabel{\scriptsize{R}}
+\BinaryInfC{$P$}
+\end{prooftree}
+
+
+Q.E.D.
+
+b) Flag Style:
+
+\begin{fitch}
+ \fa P &  PR\\
+ \fj Q &  PR\\
+\fa P &  R 1\\
+\end{fitch}
+
+Q.E.D.
+
+true.
+
+?- Welcome to SWI-Prolog (32 bits, version 9.3.34-20-g3517bc35f)
+SWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.
+For legal details and online help, see https://www.swi-prolog.org
+
+*****************************************************************
+*                   G4-mic F.O.L. PROVER  -  1.0                *
+*         (mic: minimal, intuitionistic and classical logic)    *
+*****************************************************************
+
+Because g4mic_web.pl is a Prolog program:
+never forget the dot at the end of each request!
+
+Usage:
+  prove(Formula).  - proof in three styles, with shareable URLs
+  decide(Formula). - concise mode 
+  help.            - show help
+  examples.        - show examples
+true.
+
+?- prove([p , q] > [p]).
+------------------------------------------
+G4 PROOF FOR SEQUENT: p, q |- p
+------------------------------------------
+MODE: Sequent 
+
+=== PHASE 1: Trying Minimal -> Intuitionistic -> Classical ===
+% 11 inferences, 0.000 CPU in 0.000 seconds (95% CPU, 268240 Lips)
+   Constructive proof found in MINIMAL LOGIC 
+G4 proofs in minimal logic
+
+
+
+- Sequent Calculus -
+
+\begin{prooftree}
+\AxiomC{}
+\RightLabel{\scriptsize{$Ax.$}}
+\UnaryInfC{$P, Q \vdash P$}
+\end{prooftree}
+
+Q.E.D.
+
+- Natural Deduction -
+a) Tree Style:
+
+\begin{prooftree}
+\AxiomC{$P$}
+\AxiomC{$Q$}
+\RightLabel{\scriptsize{$ R $}}
+\BinaryInfC{$P$}
+\end{prooftree}
+
+
+Q.E.D.
+
+b) Flag Style:
+
+\begin{fitch}
+ \fa P &  PR\\
+ \fj Q &  PR\\
+\fa P &  $ R $ 1\\
+\end{fitch}
+
+Q.E.D.
+
+true.
+
+?- prove(a => (b => a)).
+------------------------------------------
+G4 PROOF FOR: a=>b=>a
+------------------------------------------
+MODE: Theorem 
+
+=== PHASE 1: Trying Minimal -> Intuitionistic -> Classical ===
+% 61 inferences, 0.000 CPU in 0.000 seconds (99% CPU, 752130 Lips)
+   Proof found in MINIMAL LOGIC
+G4 proofs in minimal logic
+
+
+
+- Sequent Calculus -
+
+\begin{prooftree}
+\AxiomC{}
+\RightLabel{\scriptsize{$Ax.$}}
+\UnaryInfC{$B, A \vdash A$}
+\RightLabel{\scriptsize{$R\to$}}
+\UnaryInfC{$A \vdash B \to A$}
+\RightLabel{\scriptsize{$R\to$}}
+\UnaryInfC{$ \vdash A \to (B \to A)$}
+\end{prooftree}
+
+Q.E.D.
+
+- Natural Deduction -
+a) Tree Style:
+
+\begin{prooftree}
+\AxiomC{\scriptsize{1}}
+\noLine
+\UnaryInfC{$A$}
+\RightLabel{\scriptsize{$ \to I $}}
+\UnaryInfC{$B \to A$}
+\RightLabel{\scriptsize{$ \to I $}  1}
+\UnaryInfC{$A \to (B \to A)$}
+\end{prooftree}
+
+
+Q.E.D.
+
+b) Flag Style:
+
+\begin{fitch}
+\fa  \fh A &  AS\\
+\fa \fa  \fh B &  AS\\
+\fa \fa B \to A &  $ \to I $ 2-1\\
+\fa A \to (B \to A) &  $ \to I $ 1-3\\
+\end{fitch}
+
+Q.E.D.
+
+true.
+
+?- 
