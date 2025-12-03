@@ -371,6 +371,9 @@
 
       if (window.latexBlocks.length === 0 || buttonsAdded) return;
 
+      console.log('🔍 Starting button creation, latexBlocks:', window.latexBlocks.map((b, i) => `[${i}]:${b.type}`).join(', '));
+
+      // COLLECTER TOUS LES NŒUDS D'ABORD pour éviter de les perdre pendant la manipulation du DOM
       const walker = document.createTreeWalker(
         consoleDiv,
         NodeFilter.SHOW_TEXT,
@@ -383,41 +386,60 @@
         { pattern: /^\\end\{fitch\}$/m, blockType: 'fitch' }
       ];
 
-      let prooftreeCount = 0;
-      let fitchCount = 0;
+      // Collecter tous les nœuds qui correspondent
+      const nodesToProcess = [];
       let node;
-
       while (node = walker.nextNode()) {
         for (const item of patternsToMatch) {
           if (item.pattern.test(node.textContent)) {
             const parent = node.parentElement;
-
             if (parent && !parent.querySelector('.latex-copy-btn')) {
-              const blockIndex = item.blockType === 'prooftree' ? prooftreeCount :
-                                 window.latexBlocks.filter(b => b.type === 'prooftree').length + fitchCount;
-
-              if (item.blockType === 'prooftree') prooftreeCount++;
-              else fitchCount++;
-
-              const span = document.createElement('span');
-              span.className = 'latex-section-marker';
-              span.textContent = node.textContent;
-
-              const btn = document.createElement('button');
-              btn.className = 'latex-copy-btn';
-              btn.textContent = '📋 Copy LaTeX';
-              btn.onclick = function() {
-                copyLatexBlock(blockIndex);
-              };
-
-              span.appendChild(btn);
-              parent.replaceChild(span, node);
-              buttonsAdded = true;
-              break;
+              nodesToProcess.push({ node, parent, blockType: item.blockType });
             }
+            break;
           }
         }
       }
+
+      console.log(`📋 Found ${nodesToProcess.length} nodes to process`);
+
+      // Maintenant traiter tous les nœuds
+      let prooftreeCount = 0;
+      let fitchCount = 0;
+
+      nodesToProcess.forEach(({ node, parent, blockType }) => {
+        // Calculer le nombre total de chaque type dans latexBlocks
+        const numProoftrees = window.latexBlocks.filter(b => b.type === 'prooftree').length;
+
+        // Calculer l'index: pour prooftree, c'est prooftreeCount
+        // pour fitch, c'est numProoftrees + fitchCount
+        const blockIndex = blockType === 'prooftree' ? prooftreeCount : numProoftrees + fitchCount;
+
+        console.log(`➕ Creating button: type=${blockType}, prooftreeCount=${prooftreeCount}, fitchCount=${fitchCount}, blockIndex=${blockIndex}`);
+
+        if (blockType === 'prooftree') prooftreeCount++;
+        else fitchCount++;
+
+        const span = document.createElement('span');
+        span.className = 'latex-section-marker';
+        span.textContent = node.textContent;
+
+        const btn = document.createElement('button');
+        btn.className = 'latex-copy-btn';
+        btn.textContent = '📋 Copy LaTeX';
+        btn.dataset.blockIndex = blockIndex;
+        btn.onclick = function() {
+          const idx = parseInt(this.dataset.blockIndex);
+          console.log(`🖱️ Button clicked: stored index=${this.dataset.blockIndex}, parsed=${idx}, block type=${window.latexBlocks[idx]?.type}`);
+          copyLatexBlock(idx);
+        };
+
+        span.appendChild(btn);
+        parent.replaceChild(span, node);
+        buttonsAdded = true;
+      });
+
+      console.log(`✅ Created ${prooftreeCount} prooftree buttons and ${fitchCount} fitch buttons`);
     }
 
     function copyLatexBlock(index) {
@@ -480,17 +502,17 @@ function shareURL() {
     setInterval(addCopyButtonsToConsole, 1000);
 
     // ===== FONCTION MathJax AVEC ANTI-CLIGNOTEMENT =====
-    
+
     let lastRenderedContent = {
       sequent: '',
       tree: ''
     };
-    
+
     let isRendering = false;
-    
+
     function renderBussproofsWithMathJax() {
       if (isRendering) return;
-      
+
       const consoleDiv = document.querySelector('.tinker-console');
       if (!consoleDiv) return;
 
@@ -528,13 +550,13 @@ function shareURL() {
 
         if (prooftreeMatches && prooftreeMatches.length > 0) {
           const contentSignature = prooftreeMatches.join('|||');
-          
+
           if (lastRenderedContent[cacheKey] === contentSignature) {
             return;
           }
-          
+
           isRendering = true;
-          
+
           let container = document.getElementById(containerId);
           if (!container) {
             container = document.createElement('div');
@@ -596,8 +618,8 @@ function shareURL() {
 
     const consoleDiv = document.querySelector('.tinker-console');
     if (consoleDiv) {
-      renderObserver.observe(consoleDiv, { 
-        childList: true, 
+      renderObserver.observe(consoleDiv, {
+        childList: true,
         subtree: true
       });
     }
@@ -609,7 +631,7 @@ function shareURL() {
     // ===== CONTRÔLE MANUEL MathJax via Ctrl+M =====
     let mathJaxManualMode = true;  // Mode manuel activé par défaut
     let mathJaxCurrentlyVisible = false;  // MathJax invisible au départ
-    
+
     console.log('🎨 MathJax en mode MANUEL - Utilisez Ctrl+M ou Cmd+M pour activer/désactiver');
     // ===== FIN CONTRÔLE MANUEL =====
 
@@ -629,7 +651,7 @@ function shareURL() {
 	const hasSequent = textContent.search(/sequent/i) !== -1;
         const hasTree = textContent.search(/tree/i) !== -1;
         const hasFlag = textContent.search(/flag/i) !== -1;
-     
+
 	console.log('📌 Sections detected: Sequent=' + hasSequent + ', Tree=' + hasTree,  Flag=' + hasFlag + ');
 
       if (style === 'sequent') {
@@ -916,7 +938,7 @@ document.addEventListener('keydown', function(event) {
       // Ctrl/Cmd + m: Toggle MathJax rendering (Manual mode)
       if (key === 'm') {
         event.preventDefault();
-        
+
         if (!mathJaxCurrentlyVisible) {
           // Activer MathJax
           console.log('⌨️  Ctrl/Cmd+M: Activating MathJax rendering');
@@ -929,13 +951,13 @@ document.addEventListener('keydown', function(event) {
           const mathContainers = document.querySelectorAll('.mathjax-proof-container');
           mathContainers.forEach(container => container.remove());
           mathJaxCurrentlyVisible = false;
-          
+
           // Réinitialiser le cache pour permettre un nouveau rendu
           lastRenderedContent = {
             sequent: '',
             tree: ''
           };
-          
+
           console.log('❌ MathJax hidden - Press Ctrl/Cmd+M to render again');
         }
         return;
@@ -1127,80 +1149,80 @@ document.addEventListener('keydown', function(event) {
   })();
 </script>
 <script>
-// CORRESPONDANCE PARENTHÈSES POUR LA CONSOLE
-function checkParenthesesBalance(input) {
-    const value = input.value;
-    const openParens = (value.match(/\(/g) || []).length;
-    const closeParens = (value.match(/\)/g) || []).length;
-    
-    // Retirer les anciennes classes
-    input.classList.remove('parens-unbalanced', 'parens-highlight');
-    
-    // Ajouter la classe appropriée
-    if (openParens !== closeParens) {
-        input.classList.add('parens-unbalanced');
-    }
-    if (value.includes('(') || value.includes(')')) {
-        input.classList.add('parens-highlight');
-    }
-}
+ // CORRESPONDANCE PARENTHÈSES POUR LA CONSOLE
+ function checkParenthesesBalance(input) {
+     const value = input.value;
+     const openParens = (value.match(/\(/g) || []).length;
+     const closeParens = (value.match(/\)/g) || []).length;
 
-function enhanceConsoleInputs() {
-    const inputs = document.querySelectorAll('.tinker-console input[type="text"], .tinker-console textarea, .tinker-input input');
-    
-    inputs.forEach(input => {
-        if (input.hasAttribute('data-parenthesis-enhanced')) return;
-        input.setAttribute('data-parenthesis-enhanced', 'true');
-        
-        // Vérifier immédiatement
-        checkParenthesesBalance(input);
-        
-        // Vérifier à chaque frappe
-        input.addEventListener('input', function() {
-            checkParenthesesBalance(this);
-        });
-    });
-}
+     // Retirer les anciennes classes
+     input.classList.remove('parens-unbalanced', 'parens-highlight');
 
-// Surveiller en permanence
-setInterval(enhanceConsoleInputs, 1000);
-document.addEventListener('DOMContentLoaded', enhanceConsoleInputs);
+     // Ajouter la classe appropriée
+     if (openParens !== closeParens) {
+         input.classList.add('parens-unbalanced');
+     }
+     if (value.includes('(') || value.includes(')')) {
+         input.classList.add('parens-highlight');
+     }
+ }
+
+ function enhanceConsoleInputs() {
+     const inputs = document.querySelectorAll('.tinker-console input[type="text"], .tinker-console textarea, .tinker-input input');
+
+     inputs.forEach(input => {
+         if (input.hasAttribute('data-parenthesis-enhanced')) return;
+         input.setAttribute('data-parenthesis-enhanced', 'true');
+
+         // Vérifier immédiatement
+         checkParenthesesBalance(input);
+
+         // Vérifier à chaque frappe
+         input.addEventListener('input', function() {
+             checkParenthesesBalance(this);
+         });
+     });
+ }
+
+ // Surveiller en permanence
+ setInterval(enhanceConsoleInputs, 1000);
+ document.addEventListener('DOMContentLoaded', enhanceConsoleInputs);
 </script>
 
 <script>
-// ===== CHARGEMENT AUTOMATIQUE DE scratch.pl =====
-window.addEventListener('load', function() {
-  console.log('🔍 Recherche de scratch.pl pour chargement par défaut...');
-  
-  // Attendre que le select soit peuplé
-  setTimeout(() => {
-    const fileSelect = document.querySelector('select[name="select-file"]');
-    
-    if (!fileSelect) {
-      console.log('⚠️  Select file not found');
-      return;
-    }
-    
-    // Chercher scratch.pl dans les options
-    let scratchFound = false;
-    for (let i = 0; i < fileSelect.options.length; i++) {
-      const optionText = fileSelect.options[i].text || fileSelect.options[i].value;
-      if (optionText.includes('scratch.pl')) {
-        fileSelect.selectedIndex = i;
-        // Déclencher l'événement change pour charger le fichier
-        fileSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('✅ scratch.pl chargé par défaut');
-        scratchFound = true;
-        break;
-      }
-    }
-    
-    if (!scratchFound) {
-      console.log('ℹ️  scratch.pl non trouvé dans la liste des fichiers');
-    }
-  }, 1500); // Attendre 1.5 secondes que Tinker initialise les fichiers
-});
-// ===== FIN CHARGEMENT AUTOMATIQUE =====
+ // ===== CHARGEMENT AUTOMATIQUE DE scratch.pl =====
+ window.addEventListener('load', function() {
+     console.log('🔍 Recherche de scratch.pl pour chargement par défaut...');
+
+     // Attendre que le select soit peuplé
+     setTimeout(() => {
+         const fileSelect = document.querySelector('select[name="select-file"]');
+
+         if (!fileSelect) {
+             console.log('⚠️  Select file not found');
+             return;
+         }
+
+         // Chercher scratch.pl dans les options
+         let scratchFound = false;
+         for (let i = 0; i < fileSelect.options.length; i++) {
+             const optionText = fileSelect.options[i].text || fileSelect.options[i].value;
+             if (optionText.includes('scratch.pl')) {
+                 fileSelect.selectedIndex = i;
+                 // Déclencher l'événement change pour charger le fichier
+                 fileSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                 console.log('✅ scratch.pl chargé par défaut');
+                 scratchFound = true;
+                 break;
+             }
+         }
+
+         if (!scratchFound) {
+             console.log('ℹ️  scratch.pl non trouvé dans la liste des fichiers');
+         }
+     }, 1500); // Attendre 1.5 secondes que Tinker initialise les fichiers
+ });
+ // ===== FIN CHARGEMENT AUTOMATIQUE =====
 </script>
 </body>
 </html>

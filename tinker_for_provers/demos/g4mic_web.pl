@@ -52,7 +52,7 @@
 :- op(1150, xfx, ' \\vdash ').
 % =========================================================================
 % STARTUP BANNER
-% =========================================================================
+ % =========================================================================
 % Disable automatic SWI-Prolog banner
 :- set_prolog_flag(verbose, silent).
 
@@ -1640,18 +1640,25 @@ extract_new_formula(CurrentPremisses, SubProof, _) :-
 % ABSOLUTE PRIORITY: PREMISSES (lines 1-N where N = number of premisses)
 % =========================================================================
 
+% FIXED: Search in entire context, prefer most recent (highest line number)
+% This ensures derived formulas are used instead of premisses when both exist
 find_context_line(Formula, Context, LineNumber) :-
-    premiss_list(PremList),
-    length(PremList, NumPremisses),
-    % Search ONLY in the first N lines
-    member(LineNumber:ContextFormula, Context),
-    LineNumber =< NumPremisses,
-    % Match with different possible variants
-    ( ContextFormula = Formula
-    ; strip_annotations_match(Formula, ContextFormula)
-    ; formulas_equivalent(Formula, ContextFormula)
+    findall(
+        Line:CtxFormula,
+        (
+            member(Line:CtxFormula, Context),
+            (   CtxFormula = Formula
+            ;   strip_annotations_match(Formula, CtxFormula)
+            ;   formulas_equivalent(Formula, CtxFormula)
+            )
+        ),
+        Matches
     ),
-    !.  % Cut as soon as found in premisses
+    Matches \= [],
+    % Take the match with highest line number (most recent)
+    findall(Line, member(Line:_, Matches), LineNumbers),
+    max_list(LineNumbers, LineNumber),
+    !.
 
 % =========================================================================
 % PRIORITY -1: QUANTIFIER NEGATION (original ~ form)
@@ -2181,10 +2188,13 @@ fitch_g4_proof(ax((Premisses > [Goal])), Context, _Scope, CurLine, NextLine, Res
 % L0-implies
 fitch_g4_proof(l0cond((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
-    select((Ant => Cons), Premisses, Remaining),
-    member(Ant, Remaining),
-    find_context_line((Ant => Cons), Context, MajLine),
-    find_context_line(Ant, Context, MinLine),
+    % FIXED: Search in Context for an applicable implication, not in Premisses
+    % Find an implication (Ant => Cons) and its antecedent Ant in the current context
+    member(MajLine:(Ant => Cons), Context),
+    member(MinLine:Ant, Context),
+    % Verify we're using formulas that match what G4 expects
+    member((Ant => Cons), Premisses),
+    member(Ant, Premisses),
     DerLine is CurLine + 1,
     format(atom(Just), '$ \\to E $ ~w,~w', [MajLine, MinLine]),
     render_have(Scope, Cons, Just, CurLine, DerLine, VarIn, V1),
@@ -2330,13 +2340,13 @@ fitch_g4_proof(lor((Premisses > [Goal]), SP1, SP2), Context, Scope, CurLine, Nex
           % Disjunction is a premiss, find its line
           find_context_line((A | B), Context, DisjLine)
       ),
-      AssLineA is CurLine + 1,
-      assert_safe_fitch_line(AssLineA, A, assumption, Scope),
-      render_hypo(Scope, A, 'AS', CurLine, AssLineA, VarIn, V1),
       NewScope is Scope + 1,
+      AssLineA is CurLine + 1,
+      assert_safe_fitch_line(AssLineA, A, assumption, NewScope),
+      render_hypo(Scope, A, 'AS', CurLine, AssLineA, VarIn, V1),
       fitch_g4_proof(SP1, [AssLineA:A|Context], NewScope, AssLineA, EndA, GoalA, V1, V2),
       AssLineB is EndA + 1,
-      assert_safe_fitch_line(AssLineB, B, assumption, Scope),
+      assert_safe_fitch_line(AssLineB, B, assumption, NewScope),
       render_hypo(Scope, B, 'AS', EndA, AssLineB, V2, V3),
       fitch_g4_proof(SP2, [AssLineB:B|Context], NewScope, AssLineB, EndB, GoalB, V3, V4),
       ElimLine is EndB + 1,
@@ -2684,7 +2694,6 @@ render_nd_tree_proof(Proof) :-
             write('% Skipping tree visualization'), nl
         )
     ).
-
 % =========================================================================
 % COLLECT AND RENDER TREE
 % =========================================================================
@@ -2746,17 +2755,9 @@ wrap_premisses_in_tree(RootLineNum, AllPremisses, FinalTree) :-
 % =========================================================================
 
 build_buss_tree(LineNum, FitchLines, Tree) :-
-    ( member(LineNum-Formula-Just-Scope, FitchLines) ->
-        % Check if there's a more recent assumption with the same formula in a deeper scope
-        ( member(HypNum-Formula-assumption-HypScope, FitchLines),
-          HypNum > LineNum,
-          HypScope > Scope ->
-            % Use the hypothesis directly instead of reconstructing from LineNum
-            Tree = assumption_node(Formula, HypNum)
-        ;
-            % Normal case: build tree from justification
-            build_tree_from_just(Just, LineNum, Formula, FitchLines, Tree)
-        )
+    ( member(LineNum-Formula-Just-_Scope, FitchLines) ->
+        % Normal case: build tree from justification of this line
+        build_tree_from_just(Just, LineNum, Formula, FitchLines, Tree)
     ;
         fail
     ).
