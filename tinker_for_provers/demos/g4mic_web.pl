@@ -99,6 +99,7 @@ for(Threshold, M, N) :- M < N, M1 is M+1, for(Threshold, M1, N).
 
 :- dynamic current_proof_sequent/1.
 :- dynamic premiss_list/1.
+:- dynamic current_logic_level/1.
 
 % =========================================================================
 % OPTIMIZED CLASSICAL PATTERN DETECTION
@@ -249,13 +250,13 @@ prove(G > D) :-
     
     % Store premisses for display
     retractall(premiss_list(_)),
-    assertz(premiss_list(G)),
-    retractall(current_proof_sequent(_)),
-    assertz(current_proof_sequent(G > D)),
-    
-    % Prepare formulas
+    % Prepare formulas BEFORE storing premisses
     copy_term((G > D), (GCopy > DCopy)),
     prepare_sequent_formulas(GCopy, DCopy, PrepG, PrepD),
+    % Store PREPARED premisses (with ~z transformed to z => #)
+    assertz(premiss_list(PrepG)),
+    retractall(current_proof_sequent(_)),
+    assertz(current_proof_sequent(G > D)),
     
     % Detect classical pattern in conclusion
     ( DCopy = [SingleGoal], is_classical_pattern(SingleGoal) ->
@@ -538,6 +539,9 @@ validate_sequent_formulas(G, D) :-
 output_proof_results(Proof, LogicType, OriginalFormula, Mode) :-
     extract_formula_from_proof(Proof, Formula),
     detect_and_set_logic_level(Formula),
+    % Store logic level for use in proof rendering (e.g., DS optimization)
+    retractall(current_logic_level(_)),
+    assertz(current_logic_level(LogicType)),
     output_logic_label(LogicType),
     ( catch(
           (copy_term(Proof, ProofCopy),
@@ -2105,6 +2109,7 @@ g4_to_fitch_theorem(Proof) :-
     retractall(abbreviated_line(_)),
     fitch_g4_proof(Proof, [], 1, 0, _, _, 0, _).
 
+
 % =========================================================================
 % PREMISS DISPLAY
 % =========================================================================
@@ -2187,14 +2192,15 @@ fitch_g4_proof(ax((Premisses > [Goal])), Context, _Scope, CurLine, NextLine, Res
 
 % L0-implies
 fitch_g4_proof(l0cond((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
-    !,
-    % FIXED: Search in Context for an applicable implication, not in Premisses
-    % Find an implication (Ant => Cons) and its antecedent Ant in the current context
+    % FIXED: Find an implication where BOTH the implication AND its antecedent are present
+    % DON'T cut until we've found a valid combination
     member(MajLine:(Ant => Cons), Context),
-    member(MinLine:Ant, Context),
+    member(MinLine:Ant, Context),  % This must succeed for the same Ant
     % Verify we're using formulas that match what G4 expects
     member((Ant => Cons), Premisses),
     member(Ant, Premisses),
+    % NOW we can cut - we've found a valid combination
+    !,
     DerLine is CurLine + 1,
     format(atom(Just), '$ \\to E $ ~w,~w', [MajLine, MinLine]),
     render_have(Scope, Cons, Just, CurLine, DerLine, VarIn, V1),
@@ -2231,8 +2237,21 @@ fitch_g4_proof(lorto((Premisses > _), SubProof), Context, Scope, CurLine, NextLi
         fitch_g4_proof(SubProof, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut)
     ).
 
-% L-and: Conjunction elimination
-fitch_g4_proof(land((Premisses > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- !,
+
+% L-and: Conjunction elimination (SPECIAL CASE: implicit conjunction from comma-separated premisses)
+% When premisses are given as [P1, P2, P3], they're already available individually in Context
+% This happens with sequents like [A, B, C] > [Goal] where commas represent implicit &
+fitch_g4_proof(land((Premisses > [_Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+    % Check if this land rule is trying to decompose premisses that are already in context as separate items
+    \+ member((_ & _), Premisses),  % No explicit conjunction in Premisses
+    !,
+    % Just continue with SubProof - no &E step needed
+    % The comma-separated premisses are already in Context as individual items
+    fitch_g4_proof(SubProof, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut).
+
+% L-and: Conjunction elimination (NORMAL CASE: explicit conjunction)
+fitch_g4_proof(land((Premisses > [Goal]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :- 
+    !,
     select((A & B), Premisses, _),
     find_context_line((A & B), Context, ConjLine),
     ( is_direct_conjunct(Goal, (A & B)) ->
@@ -2326,7 +2345,47 @@ fitch_g4_proof(ip((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, Re
     NextLine = IPLine,
     ResLine = IPLine.
 
-% L-or: Disjunction elimination
+% L-or: Disjunction elimination with DS optimization
+% DISJUNCTIVE SYLLOGISM (DS): If we have A ∨ B and ¬A, derive B directly
+% Valid in intuitionistic and classical logic (not minimal logic)
+% Pattern: One branch uses explosion (¬A with A), other branch derives Goal from B
+fitch_g4_proof(lor((Premisses > [_Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+    % Try DS optimization: Check if we have A ∨ B and ¬A (A => #)
+    select((A | B), Premisses, _),
+    % Check if ¬A (i.e., A => #) is available
+    ( member((A => #), Premisses), member(_NegLine:(A => #), Context) ->
+        % We have A ∨ B and ¬A, so we can use DS to derive B directly
+        % This is valid because SP1 would just derive ⊥ from A and ¬A, then Goal by ⊥E
+        % Find the disjunction and negation in context
+        ( find_disj_context(A, B, Context, DisjLine) -> true
+        ; find_context_line((A | B), Context, DisjLine)
+        ),
+        find_context_line((A => #), Context, NegLine),
+        % Derive B by DS (without showing the explosion subproof)
+        DerLine is CurLine + 1,
+        assert_safe_fitch_line(DerLine, B, ds(DisjLine, NegLine), Scope),
+        format(atom(Just), '$ DS $ ~w,~w', [DisjLine, NegLine]),
+        render_have(Scope, B, Just, CurLine, DerLine, VarIn, V1),
+        % Continue with Goal derivation from B
+        fitch_g4_proof(SP2, [DerLine:B|Context], Scope, DerLine, NextLine, ResLine, V1, VarOut),
+        !
+    ; member((B => #), Premisses), member(_NegLine:(B => #), Context) ->
+        % Symmetric case: We have A ∨ B and ¬B, derive A by DS
+        ( find_disj_context(A, B, Context, DisjLine) -> true
+        ; find_context_line((A | B), Context, DisjLine)
+        ),
+        find_context_line((B => #), Context, NegLine),
+        DerLine is CurLine + 1,
+        assert_safe_fitch_line(DerLine, A, ds(DisjLine, NegLine), Scope),
+        format(atom(Just), '$ DS $ ~w,~w', [DisjLine, NegLine]),
+        render_have(Scope, A, Just, CurLine, DerLine, VarIn, V1),
+        fitch_g4_proof(SP1, [DerLine:A|Context], Scope, DerLine, NextLine, ResLine, V1, VarOut),
+        !
+    ;
+        fail  % DS not applicable, fall through to regular ∨E
+    ).
+
+% L-or: Disjunction elimination (regular case with full ∨E)
 fitch_g4_proof(lor((Premisses > [Goal]), SP1, SP2), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     ( try_derive_immediately(Goal, Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) ->
@@ -2670,6 +2729,7 @@ render_nd_tree_proof(Proof) :-
                 render_premiss_list_silent(PremissList, 0, 1, NextLine, InitialContext),
                 LastPremLine is NextLine - 1,
                 % Capture ResLine (6th argument) and LastLine (5th) which is the conclusion line
+                % FIXED: Suppress Fitch output with with_output_to
                 with_output_to(atom(_), fitch_g4_proof(Proof, InitialContext, 1, LastPremLine, LastLine, ResLine, 0, _)),
                 % If no line was added (pure axiom), add reiteration line
                 ( LastLine = LastPremLine ->
@@ -2886,9 +2946,15 @@ build_tree_from_just(eq_subst_eq(Line1, Line2), _LineNum, Formula, FitchLines,
 build_tree_from_just(eq_trans_chain, _LineNum, Formula, _FitchLines, 
                      axiom_node(Formula)) :- !.
 
+% DS: Disjunctive Syllogism (binary rule)
+build_tree_from_just(ds(DisjLine, NegLine), _LineNum, Formula, FitchLines, binary_node(ds, Formula, DisjTree, NegTree)) :-
+    !, build_buss_tree(DisjLine, FitchLines, DisjTree), build_buss_tree(NegLine, FitchLines, NegTree).
+
 % Fallback
 build_tree_from_just(Just, LineNum, Formula, _FitchLines, unknown_node(Just, LineNum, Formula)) :-
     format('% WARNING: Unknown justification type: ~w~n', [Just]).
+
+
 
 % =========================================================================
 % RECURSIVE TREE RENDERING (LaTeX Bussproofs)
@@ -3017,6 +3083,7 @@ format_rule_label(rand, '$ \\land I $').
 format_rule_label(lbot, '$ \\bot E $').
 format_rule_label(ip, '$ IP $').
 format_rule_label(dne_m, '$ DNE_{m} $').
+format_rule_label(ds, '$ DS $').
 format_rule_label(lex, '$ \\exists E $').
 format_rule_label(rex, '$ \\exists I $').
 format_rule_label(lall, '$ \\forall E $').
