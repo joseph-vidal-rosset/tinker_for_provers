@@ -3598,7 +3598,7 @@ rewrite((~A), J, K, (' \\lnot ' C)) :-
     rewrite(A, J, K, C).
 
 
-% QUANTIFICATEURS : Version Burse pour format X-Y
+% QUANTIFICATEURS :format X-Y
 rewrite((![X-X]:A), J, K, (' \\forall ' X ' ' C)) :-
     !,
     rewrite(A, J, K, C).
