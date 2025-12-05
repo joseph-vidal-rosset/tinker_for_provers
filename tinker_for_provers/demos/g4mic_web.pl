@@ -2190,7 +2190,7 @@ fitch_g4_proof(ax((Premisses > [Goal])), Context, _Scope, CurLine, NextLine, Res
 % PROPOSITIONAL RULES 
 % =========================================================================
 
-% L0-implies
+% L0-implies (standard Modus Ponens / →E)
 fitch_g4_proof(l0cond((Premisses > _), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     % FIXED: Find an implication where BOTH the implication AND its antecedent are present
     % DON'T cut until we've found a valid combination
@@ -2293,7 +2293,29 @@ fitch_g4_proof(ror((_ > [Goal]), SubProof), Context, Scope, CurLine, NextLine, R
 % RULES WITH HYPOTHESES (ASSUME-DISCHARGE)
 % =========================================================================
 
-% R-implies: Implication introduction
+% R-implies with MT optimization
+% MODUS TOLLENS (MT): If deriving ¬P (P→⊥) and we have P→Q and ¬Q, use MT directly
+% Valid in intuitionistic and classical logic (not minimal logic)
+% Pattern: Deriving P→⊥, and we have P→Q and Q→⊥ in premisses
+fitch_g4_proof(rcond((Premisses > [(P => #)]), _SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
+    % Try MT optimization: Check if we have P→Q where Q ≠ ⊥
+    member((P => Q), Premisses),
+    Q \= #,
+    % Check if we have ¬Q (i.e., Q → ⊥)
+    member((Q => #), Premisses),
+    % Find these formulas in context
+    member(ImpLine:(P => Q), Context),
+    member(NegLine:(Q => #), Context),
+    !,  % We found MT pattern, commit to this clause
+    % Derive ¬P by MT (without showing the detailed subproof)
+    DerLine is CurLine + 1,
+    assert_safe_fitch_line(DerLine, (P => #), mt(ImpLine, NegLine), Scope),
+    format(atom(Just), '$ MT $ ~w,~w', [ImpLine, NegLine]),
+    render_have(Scope, (P => #), Just, CurLine, DerLine, VarIn, VarOut),
+    NextLine = DerLine,
+    ResLine = DerLine.
+
+% R-implies: Implication introduction (standard case)
 fitch_g4_proof(rcond((_ > [A => B]), SubProof), Context, Scope, CurLine, NextLine, ResLine, VarIn, VarOut) :-
     !,
     HypLine is CurLine + 1,
@@ -2950,6 +2972,10 @@ build_tree_from_just(eq_trans_chain, _LineNum, Formula, _FitchLines,
 build_tree_from_just(ds(DisjLine, NegLine), _LineNum, Formula, FitchLines, binary_node(ds, Formula, DisjTree, NegTree)) :-
     !, build_buss_tree(DisjLine, FitchLines, DisjTree), build_buss_tree(NegLine, FitchLines, NegTree).
 
+% MT: Modus Tollens (binary rule)
+build_tree_from_just(mt(ImpLine, NegLine), _LineNum, Formula, FitchLines, binary_node(mt, Formula, ImpTree, NegTree)) :-
+    !, build_buss_tree(ImpLine, FitchLines, ImpTree), build_buss_tree(NegLine, FitchLines, NegTree).
+
 % Fallback
 build_tree_from_just(Just, LineNum, Formula, _FitchLines, unknown_node(Just, LineNum, Formula)) :-
     format('% WARNING: Unknown justification type: ~w~n', [Just]).
@@ -3084,6 +3110,7 @@ format_rule_label(lbot, '$ \\bot E $').
 format_rule_label(ip, '$ IP $').
 format_rule_label(dne_m, '$ DNE_{m} $').
 format_rule_label(ds, '$ DS $').
+format_rule_label(mt, '$ MT $').
 format_rule_label(lex, '$ \\exists E $').
 format_rule_label(rex, '$ \\exists I $').
 format_rule_label(lall, '$ \\forall E $').
