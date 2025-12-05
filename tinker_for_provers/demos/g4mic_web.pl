@@ -3529,8 +3529,7 @@ write_with_context((A ' \\leftrightarrow ' B), 'not') :-
 write_with_context(Formula, _Context) :-
     write_formula_with_parens(Formula).
 
-% =========================================================================
-% ADAPTED J.B. SYSTEM: direct rewrite on formulas with standard operators
+% ========================================================================
 % VERSION WITH ELEGANT PREDICATE SIMPLIFICATION
 % =========================================================================
 
